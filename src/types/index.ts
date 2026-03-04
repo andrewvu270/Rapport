@@ -78,3 +78,17 @@ export interface MinuteReservation {
   secondsReserved: number;  // stored as seconds; displayed/billed as ceil(secondsReserved / 60) minutes
   reservedAt: string;
 }
+
+// Extracted entities from intel gathering
+export interface ExtractedParticipant {
+  name: string;
+  role?: string;
+  company?: string;
+  topics: string[];
+}
+
+export interface ExtractedEntities {
+  participants: ExtractedParticipant[];
+  companies: string[];
+  topics: string[];
+}
