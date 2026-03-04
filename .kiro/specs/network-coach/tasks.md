@@ -57,32 +57,55 @@
   - **Property 11: Retry wrapper invocation count**
   - **Validates: Requirements 10.1**
 
-- [ ] 5. Serialization utilities
+- [x] 5. Serialization utilities
+
+
+
+
+
   - Implement `serialize<T>(obj: T): string` and `deserialize<T>(json: string): T` in `src/lib/serialization.ts`
   - These are thin wrappers around `JSON.stringify` / `JSON.parse` with error logging (logs document type and user ID on failure per Req 9.7)
   - _Requirements: 9 (Serialization Standard), 9.7_
 
-- [ ] 5.1 Write property test for prep document serialization round-trip
+- [x] 5.1 Write property test for prep document serialization round-trip
+
+
   - **Property 3: Serialization round-trip for prep documents**
   - **Validates: Requirements 3.5, 9 (Serialization Standard)**
 
-- [ ] 5.2 Write property test for debrief report serialization round-trip
+- [x] 5.2 Write property test for debrief report serialization round-trip
+
+
   - **Property 4: Serialization round-trip for debrief reports**
   - **Validates: Requirements 6.5, 9 (Serialization Standard)**
 
-- [ ] 6. Intel pipeline — scraping and OCR
+- [x] 6. Intel pipeline — scraping and OCR
+
+
+
+
+
   - Implement `src/services/intel/scraper.ts`: `scrapeUrl(url: string)` using Firecrawl SDK; returns extracted markdown text or throws on failure
   - Implement `src/services/intel/ocr.ts`: `extractTextFromImage(storagePath: string)` using Tesseract.js; returns extracted text string
   - Implement `src/services/intel/entityExtractor.ts`: `extractEntities(text: string)` — calls Claude API to extract names, roles, companies, topics from free text; returns structured `ExtractedEntities`
   - _Requirements: 1.2, 1.3, 1.4, 1.5_
 
-- [ ] 7. Intel pipeline — embedding and Pinecone
+- [x] 7. Intel pipeline — embedding and Pinecone
+
+
+
+
+
   - Implement `src/services/intel/embedding.ts`: `embedChunks(chunks: string[])` using OpenAI `text-embedding-3-small`; returns float arrays
   - Implement `src/services/intel/vectorStore.ts`: `upsertIntel(namespace, chunks, embeddings)` and `retrieveIntel(namespace, queryEmbedding, topK = 5)` using Pinecone SDK
   - Namespace format: `{userId}/{contextId}/{participantName}`
   - _Requirements: 2.2, 2.3_
 
-- [ ] 7.1 Write property test for Pinecone retrieval count bound
+- [x] 7.1 Write property test for Pinecone retrieval count bound
+
+
+
+
   - **Property 10: Pinecone retrieval count bound**
   - **Validates: Requirements 2.3**
 
