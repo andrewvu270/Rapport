@@ -109,59 +109,98 @@
   - **Property 10: Pinecone retrieval count bound**
   - **Validates: Requirements 2.3**
 
-- [ ] 8. Intel pipeline — Tavily agentic search and IntelService orchestration
+- [x] 8. Intel pipeline — Tavily agentic search and IntelService orchestration
+
+
+
+
+
   - Implement `src/services/intel/search.ts`: `searchParticipant(name: string, company: string)` using Tavily SDK; returns array of text snippets from past 30 days
   - Implement `src/services/IntelService.ts` that orchestrates: consent check → Firecrawl scrape → Tavily search → OCR → entity extraction → embed → Pinecone upsert; enters Degraded Mode on any external failure
   - **Token limit management**: Implement chunk budget of 2,000 characters per person; truncate scraped/searched content to first 2,000 characters before embedding to prevent Claude context overflow
   - `IntelService.gatherIntel(contextInput, consentGiven)` returns `{ participants: ExtractedParticipant[], degradedMode: boolean }`
   - _Requirements: 2.1, 2.4, 2.5, 2.6, 9.4, 9.5_
 
-- [ ] 8.1 Write property test for consent gate on intel pipeline
+- [x] 8.1 Write property test for consent gate on intel pipeline
+
+
   - **Property 14: Consent gate on intel pipeline**
   - **Validates: Requirements 9.4, 9.5**
 
-- [ ] 9. Prep generation — PrepService
+- [x] 9. Prep generation — PrepService
+
+
+
+
+
   - Implement `src/services/PrepService.ts`
   - `generateTalkingPointsCard(contextInput, participants, intelChunks, degradedMode)` — calls Claude API with structured prompt; returns `TalkingPointsCard`
   - `generatePersonCard(participant, intelChunks, degradedMode)` — calls Claude API; returns `PersonCard` with `limitedResearch: true` when `intelChunks` is empty
   - Both functions use `withRetry` for the Claude call
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
 
-- [ ] 9.1 Write property test for TalkingPointsCard structural invariant
+- [x] 9.1 Write property test for TalkingPointsCard structural invariant
+
+
   - **Property 1: TalkingPointsCard structural invariant**
   - **Validates: Requirements 3.1**
 
-- [ ] 9.2 Write property test for PersonCard structural invariant
+- [x] 9.2 Write property test for PersonCard structural invariant
+
+
   - **Property 2: PersonCard structural invariant**
   - **Validates: Requirements 3.2**
 
-- [ ] 10. Context API route and prep flow wiring
+- [x] 10. Context API route and prep flow wiring
+
+
+
+
+
   - Implement `POST /api/context`: validates input including `consentGiven` boolean field; rejects request with 400 if `consentGiven` is false or missing (server-side consent enforcement); calls `IntelService.gatherIntel`, calls `PrepService` for each participant, persists context + cards to Supabase via Serialization Standard, returns `contextId`
   - Implement `GET /api/context/[contextId]`: fetches and deserializes context, talking points card, and all person cards for the authenticated user
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 3.5, 10.4_
 
-- [ ] 11. Checkpoint — ensure all tests pass
+- [x] 11. Checkpoint — ensure all tests pass
+
+
+
+
   - Ensure all tests pass, ask the user if questions arise.
   - Expected passing tests at this checkpoint: Properties 1, 2, 3, 4, 10, 11, 14; unit test 3.1
 
-- [ ] 12. Session prompt builder
+- [x] 12. Session prompt builder
+
+
+
+
+
   - Implement `src/services/session/promptBuilder.ts`: `buildSystemPrompt(persona: PersonCard, intelChunks: string[], contextInput: ContextInput): string`
   - The prompt instructs the AI to roleplay as the persona and embeds all intel chunks inline
   - **Persona hallucination guardrail**: Include explicit instruction in system prompt: "If you do not have specific information about a participant's past experience or interests, do not invent them. Instead, act as a slightly reserved professional contact who is meeting the user for the first time."
   - _Requirements: 4.1, 4.2, 5.1_
 
-- [ ] 12.1 Write property test for session prompt construction
+- [x] 12.1 Write property test for session prompt construction
+
+
   - **Property 6: Session prompt construction contains all intel chunks**
   - **Validates: Requirements 4.1, 4.2, 5.1**
 
-- [ ] 13. Minute reservation and reconciliation
+- [x] 13. Minute reservation and reconciliation
+
+
+
+
+
   - Implement `src/services/session/minuteReservation.ts`
   - `placeReservation(sessionId, userId, sessionType)` — atomic Supabase transaction that sets `seconds_reserved` on the session row
   - `reconcileSession(sessionId, durationSeconds)` — sets `seconds_consumed = durationSeconds`, clears `seconds_reserved = 0`, updates `voice_minutes_used` or `video_minutes_used` on the user row using `ceil(durationSeconds / 60)`
   - `releaseReservation(sessionId, elapsedSeconds)` — used on interruption; sets `seconds_consumed = elapsedSeconds`, clears `seconds_reserved`
   - _Requirements: 4.4, 4.5, 4.6, 5.4, 5.5, 5.6_
 
-- [ ] 13.1 Write property test for reservation and consumption reconciliation
+- [x] 13.1 Write property test for reservation and consumption reconciliation
+
+
   - **Property 7: Second-level reservation and consumption reconciliation**
   - **Validates: Requirements 4.4, 4.5, 5.4, 5.5**
 
