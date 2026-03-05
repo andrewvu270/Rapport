@@ -217,7 +217,12 @@
   - On call drop: call `SessionService.interruptSession(sessionId, partialTranscript, elapsedSeconds)`
   - _Requirements: 4.1, 4.2, 4.3, 4.6_
 
-- [ ] 15. Video session — Tavus integration
+- [x] 15. Video session — Tavus integration
+
+
+
+
+
   - Implement `src/services/session/tavusSession.ts`:
     - `createTavusPersona(systemPrompt, intelChunks)` — initiates async persona creation; returns `{ personaId, status: 'creating' }`
     - `checkPersonaStatus(personaId)` — polls Tavus API for persona readiness; returns `{ status: 'creating' | 'ready' | 'failed' }`
