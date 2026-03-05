@@ -204,7 +204,12 @@
   - **Property 7: Second-level reservation and consumption reconciliation**
   - **Validates: Requirements 4.4, 4.5, 5.4, 5.5**
 
-- [ ] 14. Voice session — Vapi integration
+- [x] 14. Voice session — Vapi integration
+
+
+
+
+
   - Implement `src/services/session/vapiSession.ts`: `startVapiSession(systemPrompt)` — calls Vapi API to initiate a call; returns `vapiCallId`
   - Implement Vapi webhook handler at `POST /api/webhooks/vapi` to receive call end events and transcript; validate webhook signature using `VAPI_WEBHOOK_SECRET` before processing any event
   - **Webhook race condition guardrail**: Before processing end event, check if session status is already `completed` or `interrupted`; if so, ignore the webhook to prevent double-billing or redundant debrief generation
