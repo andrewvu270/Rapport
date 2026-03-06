@@ -1,0 +1,9 @@
+# Supabase Edge Function Cron Jobs
+# 
+# Schedule Edge Functions to run at specified intervals
+# Requirements: 6.6
+
+# Retry pending debrief generation every 5 minutes
+- name: "retry-pending-debriefs"
+  schedule: "*/5 * * * *"  # Every 5 minutes
+  function: "retry-pending-debriefs"
