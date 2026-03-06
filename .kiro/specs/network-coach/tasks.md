@@ -235,7 +235,11 @@
   - On drop: call `SessionService.interruptSession(sessionId, partialTranscript, elapsedSeconds)`
   - _Requirements: 5.1, 5.2, 5.3, 5.6_
 
-- [ ] 16. SessionService and session API routes
+- [x] 16. SessionService and session API routes
+
+
+
+
   - Implement `src/services/SessionService.ts` orchestrating: reservation → prompt build → Vapi/Tavus start → transcript save → reconciliation → debrief trigger
   - **Idempotency check**: At the start of `endSession()`, check if `sessions.status` is already `'completed'` or `'interrupted'`; if so, return immediately without processing to prevent race conditions between client and webhook
   - Implement `POST /api/session`: starts session (voice or video), places reservation, returns `{ sessionId, sessionUrl? }`
@@ -243,22 +247,39 @@
   - Implement `GET /api/session/[sessionId]`: returns session status and transcript
   - _Requirements: 4.1–4.6, 5.1–5.6_
 
-- [ ] 17. Checkpoint — ensure all tests pass
+- [x] 17. Checkpoint — ensure all tests pass
+
+
+
+
+
   - Ensure all tests pass, ask the user if questions arise.
   - Expected passing tests at this checkpoint: Properties 1–7, 10, 11, 14; unit test 3.1
 
-- [ ] 18. DebriefService
+- [x] 18. DebriefService
+
+
+
+
+
   - Implement `src/services/DebriefService.ts`
   - `generateDebrief(sessionId)` — reads transcript from sessions row, calls Claude API with debrief prompt, parses structured `DebriefReport`, persists via Serialization Standard
   - On Claude failure: insert `debriefs` row with `pending: true`, `pending_retry_count: 0`
   - Uses `withRetry` for the Claude call
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6_
 
-- [ ] 18.1 Write property test for DebriefReport structural invariant
+- [x] 18.1 Write property test for DebriefReport structural invariant
+
+
   - **Property 5: DebriefReport structural invariant**
   - **Validates: Requirements 6.2, 6.3, 6.4**
 
-- [ ] 19. Pending debrief background job
+- [x] 19. Pending debrief background job
+
+
+
+
+
   - Implement a Supabase Edge Function `retry-pending-debriefs` that queries `debriefs where pending = true and pending_retry_count < pending_max_retries`, retries generation, increments `pending_retry_count` on failure, sets `pending = false` on success
   - Schedule via Supabase cron to run every 5 minutes
   - _Requirements: 6.6_
