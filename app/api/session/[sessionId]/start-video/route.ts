@@ -1,16 +1,17 @@
 /**
- * GET /api/session/[sessionId]/status
+ * POST /api/session/[sessionId]/start-video
  * 
- * Polls for Tavus persona creation status (video sessions)
- * Returns session status and tavus_persona_status
+ * Starts a Tavus video session after persona is ready
+ * Should be called after polling confirms persona status is 'ready'
  * 
  * Requirements: 5.2
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/src/lib/supabase-server';
+import { startTavusVideoSession } from '@/src/services/SessionService';
 
-export async function GET(
+export async function POST(
   request: NextRequest,
   { params }: { params: { sessionId: string } }
 ) {
@@ -29,31 +30,28 @@ export async function GET(
 
     const sessionId = params.sessionId;
 
-    // Fetch session status
+    // Verify session belongs to user
     const { data: session, error: sessionError } = await supabase
       .from('sessions')
-      .select('id, status, tavus_persona_status, session_type')
+      .select('user_id')
       .eq('id', sessionId)
-      .eq('user_id', user.id)
       .single();
 
-    if (sessionError || !session) {
+    if (sessionError || !session || session.user_id !== user.id) {
       return NextResponse.json(
         { error: 'Session not found' },
         { status: 404 }
       );
     }
 
-    return NextResponse.json({
-      sessionId: session.id,
-      status: session.status,
-      tavusPersonaStatus: session.tavus_persona_status,
-      sessionType: session.session_type,
-    });
+    // Start the video session
+    const sessionUrl = await startTavusVideoSession(sessionId);
+
+    return NextResponse.json({ sessionUrl });
   } catch (error) {
-    console.error('Error fetching session status:', error);
+    console.error('Error starting video session:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to fetch session status' },
+      { error: error instanceof Error ? error.message : 'Failed to start video session' },
       { status: 500 }
     );
   }

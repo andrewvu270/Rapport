@@ -75,23 +75,31 @@ export async function POST(request: NextRequest) {
 
     const contextInput: ContextInput = contextRow.raw_input as ContextInput;
 
-    // Retrieve intel chunks from Pinecone for this person
-    // For now, we'll use empty array - intel retrieval will be wired in when vectorStore is integrated
-    const intelChunks: string[] = [];
-    // TODO: Retrieve from Pinecone using namespace from person_cards.pinecone_namespace
+    // Create a reserved session (not started yet - user must acknowledge disclaimer first)
+    const { data: session, error: createError } = await supabase
+      .from('sessions')
+      .insert({
+        user_id: user.id,
+        context_id: contextId,
+        person_card_id: personCardId,
+        session_type: sessionType,
+        status: 'reserved',
+        created_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single();
 
-    // Start the session
-    const result = await startSession({
-      userId: user.id,
-      contextId,
-      personCardId,
-      sessionType,
-      persona,
-      intelChunks,
-      contextInput,
+    if (createError || !session) {
+      return NextResponse.json(
+        { error: `Failed to create session: ${createError?.message}` },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      sessionId: session.id,
+      status: 'reserved',
     });
-
-    return NextResponse.json(result);
   } catch (error) {
     console.error('Error starting session:', error);
     return NextResponse.json(

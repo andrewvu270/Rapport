@@ -59,6 +59,13 @@ export default function LoginPage() {
               Create one
             </Link>
           </p>
+          <p className="mt-4 text-center text-xs text-gray-500">
+            By signing in, you agree to our{' '}
+            <Link href="/terms" className="text-blue-600 hover:text-blue-500 underline">
+              Terms of Service
+            </Link>
+            , which includes our persona simulation disclaimer.
+          </p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {error && (

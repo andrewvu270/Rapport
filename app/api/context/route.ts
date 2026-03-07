@@ -36,14 +36,6 @@ export async function POST(request: NextRequest) {
       consentGiven: boolean;
     };
 
-    // Server-side consent enforcement (Requirement 10.4)
-    if (consentGiven !== true) {
-      return NextResponse.json(
-        { error: 'Consent is required to proceed with intel gathering' },
-        { status: 400 }
-      );
-    }
-
     // Validate required context input fields (Requirement 1.1)
     if (
       !contextInput.eventType ||

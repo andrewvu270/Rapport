@@ -1,10 +1,10 @@
-import { tavily } from 'tavily';
+import { TavilyClient } from 'tavily';
 
 if (!process.env.TAVILY_API_KEY) {
   throw new Error('TAVILY_API_KEY environment variable is not set');
 }
 
-const tavilyClient = tavily({ apiKey: process.env.TAVILY_API_KEY });
+const tavilyClient = new TavilyClient({ apiKey: process.env.TAVILY_API_KEY });
 
 /**
  * Searches for publicly available information about a participant using Tavily agentic search.
@@ -21,10 +21,10 @@ export async function searchParticipant(name: string, company: string = ''): Pro
       ? `${name} ${company}` 
       : name;
     
-    const response = await tavilyClient.search(query, {
-      searchDepth: 'basic',
-      maxResults: 5,
-      days: 30, // Past 30 days
+    const response = await tavilyClient.search({
+      query,
+      search_depth: 'basic',
+      max_results: 5,
     });
 
     // Extract text snippets from results

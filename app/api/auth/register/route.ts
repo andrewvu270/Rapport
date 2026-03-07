@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/src/lib/supabase-server'
+import { createClient, createServiceClient } from '@/src/lib/supabase-server'
 
 export async function POST(request: NextRequest) {
   try {
@@ -40,8 +40,11 @@ export async function POST(request: NextRequest) {
       .toISOString()
       .split('T')[0]
 
+    // Use service role client to bypass RLS for initial user record creation
+    const supabaseAdmin = createServiceClient()
+
     // Insert user record with default values
-    const { error: insertError } = await supabase
+    const { error: insertError } = await supabaseAdmin
       .from('users')
       .insert({
         id: authData.user.id,

@@ -1,9 +1,19 @@
 # Supabase Edge Function Cron Jobs
 # 
 # Schedule Edge Functions to run at specified intervals
-# Requirements: 6.6
+# Requirements: 6.6, 9.1, 9.2
 
 # Retry pending debrief generation every 5 minutes
 - name: "retry-pending-debriefs"
   schedule: "*/5 * * * *"  # Every 5 minutes
   function: "retry-pending-debriefs"
+
+# Process queued Pinecone namespace deletions every 5 minutes
+- name: "process-pinecone-deletions"
+  schedule: "*/5 * * * *"  # Every 5 minutes
+  function: "process-pinecone-deletions"
+
+# Clean up expired intel daily at 2 AM UTC
+- name: "cleanup-expired-intel"
+  schedule: "0 2 * * *"  # Daily at 2 AM UTC
+  function: "cleanup-expired-intel"

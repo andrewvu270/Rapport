@@ -134,7 +134,10 @@ export default function RegisterPage() {
             </div>
             <div className="ml-3 text-sm">
               <label htmlFor="terms" className="font-medium text-gray-700">
-                I accept the terms of service
+                I accept the{' '}
+                <Link href="/terms" target="_blank" className="text-blue-600 hover:text-blue-500 underline">
+                  terms of service
+                </Link>
               </label>
               <p className="text-gray-500 mt-1">
                 I understand that NetWork uses AI to simulate practice conversations with personas 

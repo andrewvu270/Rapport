@@ -12,7 +12,7 @@
   - Create `src/lib/claude.ts`: shared Claude API client using `@anthropic-ai/sdk` with `ANTHROPIC_API_KEY` env var
   - Create `src/lib/openai.ts`: shared OpenAI client for embeddings with `OPENAI_API_KEY` env var
   - _Requirements: 3.1, 3.2, 4.1, 5.1, 6.1_
-
+make com
 - [x] 2. Supabase setup and database schema
 
 
@@ -284,31 +284,53 @@
   - Schedule via Supabase cron to run every 5 minutes
   - _Requirements: 6.6_
 
-- [ ] 20. Debrief API route
+- [x] 20. Debrief API route
+
+
+
+
+
   - Implement `GET /api/debrief/[sessionId]`: returns debrief report (or `{ pending: true }` if not yet generated)
   - _Requirements: 6.1_
 
-- [ ] 20.1 Session replay feature
+- [x] 20.1 Session replay feature
+
+
   - Add `parent_session_id` nullable column to `sessions` table to link retry sessions to originals
   - Implement `POST /api/session/[sessionId]/retry`: creates a new session using the same `person_card_id`, `context_id`, and `session_type` as the original; sets `parent_session_id` to the original session
   - Update `GET /api/history` to group retry sessions under their parent session
   - Add "Retry with same persona" button to the debrief page that calls the retry endpoint
   - _Requirements: 7.1, 7.2, 7.3, 7.4_
 
-- [ ] 21. Session history and progress dashboard
+- [x] 21. Session history and progress dashboard
+
+
+
+
+
   - Implement `GET /api/history`: returns all sessions for authenticated user ordered by `created_at DESC`
   - Implement `GET /api/history/progress`: computes per-dimension average scores across all debriefs in the current billing period (using `billing_period_start` from the user row)
   - _Requirements: 7.1, 7.2, 7.3_
 
-- [ ] 21.1 Write property test for session history ordering
+- [x] 21.1 Write property test for session history ordering
+
+
   - **Property 8: Session history ordering**
   - **Validates: Requirements 7.1**
 
-- [ ] 21.2 Write property test for average score computation
+- [x] 21.2 Write property test for average score computation
+
+
+
   - **Property 9: Average score computation**
   - **Validates: Requirements 7.3**
 
-- [ ] 22. Data privacy routes
+- [x] 22. Data privacy routes
+
+
+
+
+
   - Implement `GET /api/user/export`: serializes all user data (contexts, person_cards, sessions, debriefs) into a single JSON export object with top-level keys for each category
   - Implement `DELETE /api/user`: deletes Supabase auth user (cascades to all tables via `on delete cascade`), inserts a row into a `pinecone_deletion_queue` table with all `person_cards.pinecone_namespace` values for the user
   - Implement a Supabase Edge Function `process-pinecone-deletions` that queries `pinecone_deletion_queue`, deletes the corresponding Pinecone namespaces, marks rows as processed on success, retries up to 5 times on failure, and logs permanently failed deletions for manual review
@@ -316,25 +338,29 @@
   - Schedule `process-pinecone-deletions` via Supabase cron to run every 5 minutes; schedule `cleanup-expired-intel` to run daily
   - _Requirements: 9.1, 9.2, 9.3_
 
-- [ ] 22.1 Write property test for account deletion data removal
+- [x] 22.1 Write property test for account deletion data removal
+
+
   - **Property 12: Account deletion removes all data**
   - **Validates: Requirements 9.1**
 
-- [ ] 22.2 Write property test for data export completeness
+- [x] 22.2 Write property test for data export completeness
+
+
   - **Property 13: Data export completeness**
   - **Validates: Requirements 9.3**
 
-- [ ] 23. Frontend — context input and prep screens
+- [x] 23. Frontend — context input and prep screens
   - Build `/prep` page: context input form with all required fields (event type, industry, user role, user goal, target people), URL input, screenshot upload, plain-text notes; consent notice modal before intel gathering begins
   - Build `/prep/[contextId]` page: displays Talking Points Card and Person Cards; degraded mode banner when applicable
   - Wire to `POST /api/context` and `GET /api/context/[contextId]`
   - _Requirements: 1.1, 2.4, 9.4, 9.5_
 
-- [ ] 23.1 Write unit test for context form fields
+- [x] 23.1 Write unit test for context form fields
   - Verify all five required fields (event type, industry, user role, user goal, target people) are present in the rendered form
   - _Requirements: 1.1_
 
-- [ ] 24. Frontend — session screen
+- [x] 24. Frontend — session screen
   - Build `/session/[sessionId]` page with the following UX flow:
     1. **Pre-session state**: Display persona simulation disclaimer with "I understand" checkbox; show Person Card summary and session type (voice/video); "Start Practice" button disabled until disclaimer acknowledged
     2. **Connecting state**: Show loading spinner with "Connecting to [Persona Name]..." message; for video sessions, display "Preparing video avatar..." during async Tavus persona creation; poll `/api/session/[sessionId]/status` every 2 seconds
@@ -344,7 +370,7 @@
     6. **Post-session state**: Show "Session complete" message with automatic redirect to debrief page after 2 seconds
   - _Requirements: 4.1, 5.2, 10.8_
 
-- [ ] 24.1 Frontend — debrief screen
+- [x] 24.1 Frontend — debrief screen
   - Build `/debrief/[sessionId]` page with the following components:
     1. **Score visualization**: Four radial/gauge charts for openers, question quality, response relevance, and closing (1-10 scale); color-coded (red < 4, yellow 4-6, green > 6)
     2. **Improvable moments section**: Expandable cards showing the user's original response, the AI's suggested alternative, and the turn context from the transcript
@@ -354,11 +380,11 @@
     6. **Loading state**: Skeleton UI while polling `GET /api/debrief/[sessionId]`; "Generating your feedback..." message when `pending: true`
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 7.1_
 
-- [ ] 24.2 Write unit test for persona simulation disclaimer
+- [x] 24.2 Write unit test for persona simulation disclaimer
   - Verify that the persona simulation disclaimer text is rendered on the session start screen and the "Start Practice" button is disabled until the disclaimer checkbox is checked
   - _Requirements: 10.8_
 
-- [ ] 25. Frontend — history and auth screens
+- [x] 25. Frontend — history and auth screens
   - Build `/history` page:
     1. **Session list**: Cards showing persona name, date, session type badge (voice/video), and overall score average; retry sessions indented under parent with "Attempt #N" label
     2. **Progress dashboard**: Line chart showing score trends over time; bar chart comparing dimension averages for current billing period
@@ -366,6 +392,6 @@
   - Build `/auth/login` and `/auth/register` pages; include link to terms of service with persona simulation disclaimer
   - _Requirements: 7.4, 8.1, 8.3, 8.1, 8.3, 10.8_
 
-- [ ] 26. Final checkpoint — ensure all tests pass
+- [x] 26. Final checkpoint — ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
   - Expected passing tests at this checkpoint: All 14 properties; all unit tests (3.1, 23.1, 24.2)
