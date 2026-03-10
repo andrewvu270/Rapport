@@ -8,6 +8,7 @@ import { createClient } from '@/src/lib/supabase'
 export default function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const nextPath = searchParams.get('next') || '/history'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -16,7 +17,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (searchParams.get('registered') === 'true') {
-      setSuccessMessage('Account created successfully! Please sign in.')
+      setSuccessMessage('Account created! Please sign in.')
     }
   }, [searchParams])
 
@@ -25,19 +26,11 @@ export default function LoginPage() {
     setError('')
     setSuccessMessage('')
     setLoading(true)
-
     try {
       const supabase = createClient()
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-
-      if (signInError) {
-        throw signInError
-      }
-
-      router.push('/')
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+      if (signInError) throw signInError
+      router.push(nextPath)
       router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Authentication failed')
@@ -47,82 +40,82 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Sign in to your account
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Don't have an account?{' '}
-            <Link href="/auth/register" className="font-medium text-blue-600 hover:text-blue-500">
-              Create one
-            </Link>
-          </p>
-          <p className="mt-4 text-center text-xs text-gray-500">
-            By signing in, you agree to our{' '}
-            <Link href="/terms" className="text-blue-600 hover:text-blue-500 underline">
-              Terms of Service
-            </Link>
-            , which includes our persona simulation disclaimer.
-          </p>
+    <div className="min-h-screen bg-[#09090b] flex items-center justify-center px-4">
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[300px] bg-violet-500/6 blur-[120px] rounded-full" />
+      </div>
+
+      <div className="relative w-full max-w-sm animate-slide-up">
+        <div className="text-center mb-8">
+          <Link href="/" className="text-sm font-semibold text-zinc-100 hover:text-white transition-colors">
+            NetWork
+          </Link>
+          <p className="mt-2 text-sm text-zinc-500">Sign in to your account</p>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8">
           {error && (
-            <div className="rounded-md bg-red-50 p-4">
-              <p className="text-sm text-red-800">{error}</p>
+            <div className="mb-5 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400">
+              {error}
             </div>
           )}
           {successMessage && (
-            <div className="rounded-md bg-green-50 p-4">
-              <p className="text-sm text-green-800">{successMessage}</p>
+            <div className="mb-5 px-4 py-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-sm text-emerald-400">
+              {successMessage}
             </div>
           )}
-          <div className="rounded-md shadow-sm -space-y-px">
+
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="email" className="sr-only">
-                Email address
+              <label htmlFor="email" className="block text-xs font-medium text-zinc-500 mb-1.5 uppercase tracking-wider">
+                Email
               </label>
               <input
                 id="email"
-                name="email"
                 type="email"
                 autoComplete="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                placeholder="Email address"
+                placeholder="you@example.com"
+                className="w-full px-3 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/20 transition-colors"
               />
             </div>
             <div>
-              <label htmlFor="password" className="sr-only">
+              <label htmlFor="password" className="block text-xs font-medium text-zinc-500 mb-1.5 uppercase tracking-wider">
                 Password
               </label>
               <input
                 id="password"
-                name="password"
                 type="password"
                 autoComplete="current-password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                placeholder="Password"
+                placeholder="••••••••"
+                className="w-full px-3 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/20 transition-colors"
               />
             </div>
-          </div>
-
-          <div>
             <button
               type="submit"
               disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full mt-2 bg-violet-500 hover:bg-violet-600 disabled:opacity-50 disabled:cursor-not-allowed text-white py-2.5 rounded-lg text-sm font-medium transition-colors active:scale-[0.98]"
             >
               {loading ? 'Signing in...' : 'Sign in'}
             </button>
-          </div>
-        </form>
+          </form>
+        </div>
+
+        <p className="mt-5 text-center text-sm text-zinc-600">
+          Don't have an account?{' '}
+          <Link href="/auth/register" className="text-violet-400 hover:text-violet-300 transition-colors">
+            Create one
+          </Link>
+        </p>
+        <p className="mt-3 text-center text-xs text-zinc-700">
+          By signing in, you agree to our{' '}
+          <Link href="/terms" className="text-zinc-600 hover:text-zinc-400 underline transition-colors">Terms of Service</Link>
+        </p>
       </div>
     </div>
   )

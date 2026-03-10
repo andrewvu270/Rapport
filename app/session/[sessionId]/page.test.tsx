@@ -36,8 +36,8 @@ describe('SessionPage - Persona Simulation Disclaimer', () => {
 
   const mockPersonCard = {
     id: mockPersonCardId,
-    participant_name: 'John Doe',
-    card_data: {
+    participantName: 'John Doe',
+    card: {
       participantName: 'John Doe',
       profileSummary: 'Senior Engineer at Tech Corp',
       icebreakers: ['Ask about recent project', 'Discuss tech trends', 'Talk about career path'],

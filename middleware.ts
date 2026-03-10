@@ -54,28 +54,26 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Refresh session if expired
-  await supabase.auth.getUser()
+  // Refresh session if expired and get user once
+  const { data: { user } } = await supabase.auth.getUser()
 
-  // Check if the route is an API route that needs protection
-  if (request.nextUrl.pathname.startsWith('/api/')) {
-    const publicRoutes = ['/api/auth/register', '/api/auth/login']
-    const isPublicRoute = publicRoutes.some(route => 
-      request.nextUrl.pathname.startsWith(route)
-    )
+  const { pathname } = request.nextUrl
 
-    if (!isPublicRoute) {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+  const publicPageRoutes = ['/', '/auth/login', '/auth/register', '/terms', '/privacy']
+  const publicApiPrefixes = ['/api/auth/register', '/api/auth/login', '/api/webhooks/']
 
-      if (!user) {
-        return NextResponse.json(
-          { error: 'Unauthorized' },
-          { status: 401 }
-        )
-      }
-    }
+  const isApiRoute = pathname.startsWith('/api/')
+  const isPublicApi = publicApiPrefixes.some(r => pathname.startsWith(r))
+  const isPublicPage = publicPageRoutes.includes(pathname)
+
+  if (isApiRoute && !isPublicApi && !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  if (!isApiRoute && !isPublicPage && !user) {
+    const loginUrl = new URL('/auth/login', request.url)
+    loginUrl.searchParams.set('next', pathname)
+    return NextResponse.redirect(loginUrl)
   }
 
   return response

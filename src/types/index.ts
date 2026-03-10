@@ -10,10 +10,8 @@ export interface ContextInput {
   plainTextNotes?: string;
 }
 
-// Talking Points Card
+// Talking Points Card — event-level only (key lessons / reminders)
 export interface TalkingPointsCard {
-  openers: string[];           // 3-5 items
-  followUpQuestions: string[]; // 3-5 items
   lessons: string[];           // exactly 3 items
   generatedAt: string;         // ISO timestamp
   degradedMode: boolean;
@@ -24,9 +22,12 @@ export interface PersonCard {
   participantName: string;
   profileSummary: string;
   icebreakers: string[];       // exactly 3, intel-grounded
+  openers: string[];           // 3-5 conversation starters specific to this person
+  followUpQuestions: string[]; // 3-5 follow-ups specific to this person
   topicsOfInterest: string[];
   thingsToAvoid: string[];
   suggestedAsk: string;
+  replicaGender: 'male' | 'female';  // inferred from name/profile for Tavus replica selection
   limitedResearch: boolean;
   generatedAt: string;
 }

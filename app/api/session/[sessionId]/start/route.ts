@@ -10,10 +10,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/src/lib/supabase-server';
 import { PersonCard, ContextInput } from '@/src/types';
+import { deserialize } from '@/src/lib/serialization';
 import { placeReservation } from '@/src/services/session/minuteReservation';
 import { buildSystemPrompt } from '@/src/services/session/promptBuilder';
 import { startVapiSession } from '@/src/services/session/vapiSession';
-import { createTavusPersona } from '@/src/services/session/tavusSession';
+import { startTavusVideoSession } from '@/src/services/session/tavusSession';
 
 export async function POST(
   request: NextRequest,
@@ -71,7 +72,7 @@ export async function POST(
       );
     }
 
-    const persona: PersonCard = personCardRow.card_data as PersonCard;
+    const persona: PersonCard = deserialize<PersonCard>(personCardRow.card_data);
 
     // Fetch context
     const { data: contextRow, error: contextError } = await supabase
@@ -124,16 +125,21 @@ export async function POST(
           status: 'active',
         });
       } else {
-        // Video session: create Tavus persona (async)
-        const { personaId } = await createTavusPersona(systemPrompt, intelChunks);
+        // Video session: create Tavus persona + conversation synchronously (v2 API)
+        const { conversationId, conversationUrl, personaId } = await startTavusVideoSession(
+          persona,
+          systemPrompt,
+          contextInput
+        );
 
-        // Update session with persona ID and set to preparing
         const { error: updateError } = await supabase
           .from('sessions')
           .update({
             tavus_persona_id: personaId,
-            tavus_persona_status: 'creating',
-            status: 'preparing',
+            tavus_conversation_id: conversationId,
+            tavus_persona_status: 'ready',
+            status: 'active',
+            started_at: new Date().toISOString(),
           })
           .eq('id', sessionId);
 
@@ -143,7 +149,8 @@ export async function POST(
 
         return NextResponse.json({
           sessionId,
-          status: 'preparing',
+          status: 'active',
+          sessionUrl: conversationUrl,
         });
       }
     } catch (error) {

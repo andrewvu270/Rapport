@@ -33,8 +33,8 @@ interface SessionData {
 
 interface PersonCardData {
   id: string;
-  participant_name: string;
-  card_data: PersonCard;
+  participantName: string;
+  card: PersonCard;
 }
 
 export default function SessionPage() {
@@ -99,6 +99,38 @@ export default function SessionPage() {
 
     fetchSession();
   }, [sessionId]);
+
+  // Poll for completion while video session is active (webhook sets status to 'completed')
+  useEffect(() => {
+    if (session?.status === 'active' && session.session_type === 'video') {
+      const pollCompletion = async () => {
+        try {
+          const response = await fetch(`/api/session/${sessionId}/status`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.status === 'completed' || data.status === 'interrupted') {
+              setSession(prev => prev ? { ...prev, status: data.status } : null);
+              if (pollingRef.current) {
+                clearInterval(pollingRef.current);
+                pollingRef.current = null;
+              }
+            }
+          }
+        } catch (err) {
+          console.error('Error polling session completion:', err);
+        }
+      };
+
+      pollingRef.current = setInterval(pollCompletion, 3000);
+
+      return () => {
+        if (pollingRef.current) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
+      };
+    }
+  }, [session?.status, session?.session_type, sessionId]);
 
   // Poll for status when preparing (video sessions)
   useEffect(() => {
@@ -226,9 +258,14 @@ export default function SessionPage() {
       }
 
       const data = await response.json();
-      
+
       // Update session status
       setSession(prev => prev ? { ...prev, status: data.status } : null);
+
+      // For video sessions the conversation URL comes back immediately
+      if (data.sessionUrl) {
+        setSessionUrl(data.sessionUrl);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start session');
     } finally {
@@ -428,10 +465,10 @@ export default function SessionPage() {
             
             <div className="mb-6">
               <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                {personCard.participant_name}
+                {personCard.participantName}
               </h3>
               <p className="text-gray-600 mb-4">
-                {personCard.card_data.profileSummary}
+                {personCard.card.profileSummary}
               </p>
               
               <div className="flex items-center space-x-4 text-sm text-gray-600">
@@ -450,7 +487,7 @@ export default function SessionPage() {
                 Quick Tips
               </h4>
               <ul className="space-y-1 text-sm text-gray-600">
-                {personCard.card_data.icebreakers.slice(0, 2).map((tip, index) => (
+                {personCard.card.icebreakers.slice(0, 2).map((tip, index) => (
                   <li key={index} className="flex items-start">
                     <span className="text-blue-600 mr-2">•</span>
                     <span>{tip}</span>
@@ -484,7 +521,7 @@ export default function SessionPage() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-6"></div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            Connecting to {personCard.participant_name}...
+            Connecting to {personCard.participantName}...
           </h2>
           {session.session_type === 'video' && (
             <p className="text-gray-600">
@@ -496,32 +533,44 @@ export default function SessionPage() {
     );
   }
 
-  // Active session state
-  if (session.status === 'active') {
+  // Active session state — video
+  if (session.status === 'active' && session.session_type === 'video') {
+    return (
+      <div className="fixed inset-0 bg-black">
+        {sessionUrl ? (
+          <iframe
+            src={sessionUrl}
+            className="w-full h-full"
+            allow="camera; microphone; fullscreen"
+            title="Video Session"
+          />
+        ) : (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+              <p className="text-white">Loading video session...</p>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Active session state — voice
+  if (session.status === 'active' && session.session_type === 'voice') {
     return (
       <div className="min-h-screen bg-gray-900">
-        {/* Header with elapsed time and end button */}
         <div className="bg-gray-800 border-b border-gray-700 px-6 py-4">
           <div className="max-w-7xl mx-auto flex items-center justify-between">
             <div>
-              <h1 className="text-xl font-semibold text-white">
-                {personCard.participant_name}
-              </h1>
-              <p className="text-sm text-gray-400">
-                {session.session_type === 'voice' ? 'Voice Session' : 'Video Session'}
-              </p>
+              <h1 className="text-xl font-semibold text-white">{personCard.participantName}</h1>
+              <p className="text-sm text-gray-400">Voice Session</p>
             </div>
-            
             <div className="flex items-center space-x-6">
-              {/* Elapsed Time */}
               <div className="text-center">
-                <div className="text-2xl font-mono font-bold text-white">
-                  {formatTime(elapsedSeconds)}
-                </div>
+                <div className="text-2xl font-mono font-bold text-white">{formatTime(elapsedSeconds)}</div>
                 <div className="text-xs text-gray-400">Elapsed</div>
               </div>
-
-              {/* End Session Button */}
               <button
                 onClick={handleEndSession}
                 disabled={isEnding}
@@ -532,89 +581,18 @@ export default function SessionPage() {
             </div>
           </div>
         </div>
-
-        {/* Session Content */}
         <div className="max-w-7xl mx-auto p-6">
-          {session.session_type === 'voice' ? (
-            // Voice Mode
-            <div className="bg-gray-800 rounded-lg p-12 text-center">
-              <div className="mb-8">
-                <div className="w-32 h-32 bg-blue-600 rounded-full mx-auto flex items-center justify-center">
-                  <svg
-                    className="w-16 h-16 text-white"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
-                    />
-                  </svg>
-                </div>
-              </div>
-              
-              <h2 className="text-2xl font-bold text-white mb-4">
-                Voice Session Active
-              </h2>
-              <p className="text-gray-400 mb-8">
-                Speak naturally with {personCard.participant_name}
-              </p>
-
-              {/* Microphone Controls Placeholder */}
-              <div className="flex items-center justify-center space-x-4">
-                <button className="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center hover:bg-gray-600 transition-colors">
-                  <svg
-                    className="w-8 h-8 text-white"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"
-                    />
-                  </svg>
-                </button>
+          <div className="bg-gray-800 rounded-lg p-12 text-center">
+            <div className="mb-8">
+              <div className="w-32 h-32 bg-blue-600 rounded-full mx-auto flex items-center justify-center">
+                <svg className="w-16 h-16 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                </svg>
               </div>
             </div>
-          ) : (
-            // Video Mode
-            <div className="relative bg-black rounded-lg overflow-hidden" style={{ paddingBottom: '56.25%' }}>
-              {sessionUrl ? (
-                <iframe
-                  src={sessionUrl}
-                  className="absolute top-0 left-0 w-full h-full"
-                  allow="camera; microphone"
-                  title="Video Session"
-                />
-              ) : (
-                <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-                    <p className="text-white">Loading video session...</p>
-                  </div>
-                </div>
-              )}
-              
-              {/* Elapsed Time Overlay */}
-              <div className="absolute top-4 right-4 bg-black bg-opacity-75 px-4 py-2 rounded-lg">
-                <div className="text-xl font-mono font-bold text-white">
-                  {formatTime(elapsedSeconds)}
-                </div>
-              </div>
-            </div>
-          )}
+            <h2 className="text-2xl font-bold text-white mb-4">Voice Session Active</h2>
+            <p className="text-gray-400">Speak naturally with {personCard.participantName}</p>
+          </div>
         </div>
       </div>
     );

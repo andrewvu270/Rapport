@@ -6,7 +6,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/src/lib/supabase-server';
-import { startSession } from '@/src/services/SessionService';
 import { PersonCard, ContextInput } from '@/src/types';
 
 export async function POST(request: NextRequest) {

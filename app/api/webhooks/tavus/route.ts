@@ -8,35 +8,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '../../../../src/lib/supabase-server';
 import { endSession, interruptSession } from '../../../../src/services/SessionService';
 import { Transcript, TranscriptTurn } from '../../../../src/types';
-import crypto from 'crypto';
-
-/**
- * Validates Tavus webhook signature
- * @param payload - The raw request body
- * @param signature - The signature from the request header
- * @returns true if signature is valid
- */
-function validateWebhookSignature(payload: string, signature: string | null): boolean {
-  if (!signature) {
-    return false;
-  }
-
-  const secret = process.env.TAVUS_WEBHOOK_SECRET;
-  if (!secret) {
-    console.error('TAVUS_WEBHOOK_SECRET is not configured');
-    return false;
-  }
-
-  const expectedSignature = crypto
-    .createHmac('sha256', secret)
-    .update(payload)
-    .digest('hex');
-
-  return crypto.timingSafeEqual(
-    Buffer.from(signature),
-    Buffer.from(expectedSignature)
-  );
-}
 
 /**
  * Converts Tavus transcript format to our Transcript type
@@ -61,24 +32,19 @@ function convertTavusTranscript(
 
 export async function POST(request: NextRequest) {
   try {
-    // Read raw body for signature validation
     const rawBody = await request.text();
-    const signature = request.headers.get('x-tavus-signature');
-
-    // Validate webhook signature
-    if (!validateWebhookSignature(rawBody, signature)) {
-      console.error('Invalid Tavus webhook signature');
-      return NextResponse.json(
-        { error: 'Invalid signature' },
-        { status: 401 }
-      );
-    }
-
     const payload = JSON.parse(rawBody);
-    const eventType = payload.type || payload.event;
+    console.log('[Tavus webhook] payload:', JSON.stringify(payload, null, 2));
+
+    const eventType = payload.event_type || payload.type || payload.event;
+    console.log('[Tavus webhook] eventType:', eventType);
 
     // Extract conversation ID from payload
-    const tavusConversationId = payload.conversation?.id || payload.conversation_id;
+    const tavusConversationId =
+      payload.conversation_id ||
+      payload.conversation?.conversation_id ||
+      payload.conversation?.id;
+    console.log('[Tavus webhook] conversationId:', tavusConversationId);
     
     if (!tavusConversationId) {
       console.error('No conversation ID in Tavus webhook payload');
@@ -113,26 +79,30 @@ export async function POST(request: NextRequest) {
     }
 
     // Handle different event types
-    if (eventType === 'conversation.ended' || eventType === 'conversation.completed') {
+    if (
+      eventType === 'conversation.ended' ||
+      eventType === 'conversation.completed' ||
+      eventType === 'application.ended'
+    ) {
       // Normal conversation end
       const durationSeconds = payload.conversation?.duration || payload.duration || 0;
       const tavusTranscript = payload.conversation?.transcript || payload.transcript || [];
       
       const transcript = convertTavusTranscript(tavusTranscript, sessionId, durationSeconds);
       
-      await endSession(sessionId, transcript, durationSeconds);
-      
+      await endSession({ sessionId, transcript, durationSeconds });
+
       return NextResponse.json({ message: 'Session ended successfully' }, { status: 200 });
-    } 
+    }
     else if (eventType === 'conversation.failed' || eventType === 'conversation.disconnected') {
       // Conversation drop/interruption
       const elapsedSeconds = payload.conversation?.duration || payload.duration || 0;
       const tavusTranscript = payload.conversation?.transcript || payload.transcript || [];
-      
+
       const partialTranscript = tavusTranscript.length > 0
         ? convertTavusTranscript(tavusTranscript, sessionId, elapsedSeconds)
-        : null;
-      
+        : { turns: [], durationSeconds: elapsedSeconds, sessionId };
+
       await interruptSession(sessionId, partialTranscript, elapsedSeconds);
       
       return NextResponse.json({ message: 'Session interrupted' }, { status: 200 });

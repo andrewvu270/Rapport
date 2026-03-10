@@ -113,7 +113,7 @@ export class DebriefService {
     const prompt = this.buildDebriefPrompt(transcript);
 
     const response = await claude.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'claude-sonnet-4-6',
       max_tokens: 4096,
       messages: [
         {
@@ -128,7 +128,9 @@ export class DebriefService {
       throw new Error('Claude API returned no text content');
     }
 
-    const parsedResponse = JSON.parse(textContent.text);
+    const jsonMatch = textContent.text.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
+    const jsonText = jsonMatch ? jsonMatch[1] : textContent.text;
+    const parsedResponse = JSON.parse(jsonText);
 
     // Construct the debrief report
     const debriefReport: DebriefReport = {

@@ -120,19 +120,19 @@ export async function POST(request: NextRequest) {
       
       const transcript = convertVapiTranscript(vapiTranscript, sessionId, durationSeconds);
       
-      await endSession(sessionId, transcript, durationSeconds);
-      
+      await endSession({ sessionId, transcript, durationSeconds });
+
       return NextResponse.json({ message: 'Session ended successfully' }, { status: 200 });
-    } 
+    }
     else if (eventType === 'call.failed' || eventType === 'call.disconnected') {
       // Call drop/interruption
       const elapsedSeconds = payload.call?.duration || payload.duration || 0;
       const vapiTranscript = payload.call?.transcript || payload.transcript || [];
-      
+
       const partialTranscript = vapiTranscript.length > 0
         ? convertVapiTranscript(vapiTranscript, sessionId, elapsedSeconds)
-        : null;
-      
+        : { turns: [], durationSeconds: elapsedSeconds, sessionId };
+
       await interruptSession(sessionId, partialTranscript, elapsedSeconds);
       
       return NextResponse.json({ message: 'Session interrupted' }, { status: 200 });

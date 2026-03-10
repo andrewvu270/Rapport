@@ -107,7 +107,7 @@ export async function reconcileSession(
       throw new Error(`Failed to fetch user data: ${fetchError?.message}`);
     }
 
-    const currentMinutes = userData[columnToUpdate] || 0;
+    const currentMinutes = (userData as Record<string, number>)[columnToUpdate] || 0;
 
     // Update with new value
     const { error: manualUpdateError } = await supabase

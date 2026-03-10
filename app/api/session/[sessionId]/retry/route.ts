@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/src/lib/supabase-server';
 import { startSession } from '@/src/services/SessionService';
 import { PersonCard, ContextInput } from '@/src/types';
+import { deserialize } from '@/src/lib/serialization';
 
 export async function POST(
   request: NextRequest,
@@ -63,7 +64,7 @@ export async function POST(
       );
     }
 
-    const persona: PersonCard = personCardRow.card_data as PersonCard;
+    const persona: PersonCard = deserialize<PersonCard>(personCardRow.card_data);
 
     // Fetch the context to get contextInput
     const { data: contextRow, error: contextError } = await supabase

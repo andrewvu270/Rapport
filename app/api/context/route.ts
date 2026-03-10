@@ -8,11 +8,87 @@ import { serialize } from '@/src/lib/serialization';
 import { ContextInput } from '@/src/types';
 
 /**
+ * GET /api/context
+ * Returns all contexts for the authenticated user with person cards and session counts.
+ */
+export async function GET(_request: NextRequest) {
+  try {
+    const supabase = createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: contexts, error: contextsError } = await supabase
+      .from('contexts')
+      .select(`
+        id,
+        event_type,
+        industry,
+        user_role,
+        user_goal,
+        created_at,
+        expires_at,
+        person_cards (
+          id,
+          participant_name,
+          limited_research
+        )
+      `)
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (contextsError) {
+      return NextResponse.json({ error: 'Failed to fetch contexts' }, { status: 500 });
+    }
+
+    const enriched = await Promise.all((contexts || []).map(async (ctx: any) => {
+      const personCardIds = (ctx.person_cards || []).map((pc: any) => pc.id);
+      const sessionCounts: Record<string, number> = {};
+
+      if (personCardIds.length > 0) {
+        const { data: sessions } = await supabase
+          .from('sessions')
+          .select('person_card_id')
+          .in('person_card_id', personCardIds)
+          .eq('user_id', user.id)
+          .is('parent_session_id', null);
+
+        (sessions || []).forEach((s: any) => {
+          sessionCounts[s.person_card_id] = (sessionCounts[s.person_card_id] || 0) + 1;
+        });
+      }
+
+      return {
+        id: ctx.id,
+        eventType: ctx.event_type,
+        industry: ctx.industry,
+        userRole: ctx.user_role,
+        userGoal: ctx.user_goal,
+        createdAt: ctx.created_at,
+        expiresAt: ctx.expires_at,
+        personCards: (ctx.person_cards || []).map((pc: any) => ({
+          id: pc.id,
+          participantName: pc.participant_name,
+          limitedResearch: pc.limited_research,
+          sessionCount: sessionCounts[pc.id] || 0,
+        })),
+      };
+    }));
+
+    return NextResponse.json({ contexts: enriched });
+  } catch (error) {
+    console.error('Error in GET /api/context:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+/**
  * POST /api/context
- * 
+ *
  * Creates a new context, gathers intel, generates prep materials.
  * Validates consent and rejects if not given.
- * 
+ *
  * Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 3.5, 10.4
  */
 export async function POST(request: NextRequest) {
@@ -115,6 +191,7 @@ export async function POST(request: NextRequest) {
 
       const personCard = await prepService.generatePersonCard(
         participant,
+        contextInput,
         personIntelChunks,
         degradedMode
       );

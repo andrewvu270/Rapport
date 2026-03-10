@@ -11,7 +11,8 @@ import { Transcript, PersonCard, ContextInput } from '../types';
 import { placeReservation, reconcileSession, releaseReservation } from './session/minuteReservation';
 import { buildSystemPrompt } from './session/promptBuilder';
 import { startVapiSession } from './session/vapiSession';
-import { createTavusPersona, startTavusSession } from './session/tavusSession';
+import { startTavusVideoSession as startTavusV2 } from './session/tavusSession';
+import { DebriefService } from './DebriefService';
 
 interface StartSessionParams {
   userId: string;
@@ -93,26 +94,32 @@ export async function startSession(params: StartSessionParams): Promise<StartSes
         status: 'active',
       };
     } else {
-      // Video session: create Tavus persona (async)
-      const { personaId } = await createTavusPersona(systemPrompt, intelChunks);
+      // Video session: synchronously create Tavus persona + conversation (v2 API)
+      const { conversationId, conversationUrl, personaId } = await startTavusV2(
+        persona,
+        systemPrompt,
+        contextInput
+      );
 
-      // Update session with persona ID and status
       const { error: updateError } = await supabase
         .from('sessions')
         .update({
           tavus_persona_id: personaId,
-          tavus_persona_status: 'creating',
-          status: 'preparing',
+          tavus_conversation_id: conversationId,
+          tavus_persona_status: 'ready',
+          status: 'active',
+          started_at: new Date().toISOString(),
         })
         .eq('id', sessionId);
 
       if (updateError) {
-        throw new Error(`Failed to update session with Tavus persona ID: ${updateError.message}`);
+        throw new Error(`Failed to update session with Tavus IDs: ${updateError.message}`);
       }
 
       return {
         sessionId,
-        status: 'preparing',
+        sessionUrl: conversationUrl,
+        status: 'active',
       };
     }
   } catch (error) {
@@ -123,16 +130,15 @@ export async function startSession(params: StartSessionParams): Promise<StartSes
 }
 
 /**
- * Starts a Tavus video session after persona is ready
- * Should be called after polling confirms persona status is 'ready'
+ * Returns the Tavus conversation URL for an active video session.
+ * With the v2 synchronous API, the conversation is created during startSession.
  */
 export async function startTavusVideoSession(sessionId: string): Promise<string> {
   const supabase = createServiceClient();
 
-  // Get the persona ID from the session
   const { data: session, error: fetchError } = await supabase
     .from('sessions')
-    .select('tavus_persona_id, tavus_persona_status')
+    .select('tavus_conversation_id, status')
     .eq('id', sessionId)
     .single();
 
@@ -140,28 +146,13 @@ export async function startTavusVideoSession(sessionId: string): Promise<string>
     throw new Error(`Failed to fetch session: ${fetchError?.message}`);
   }
 
-  if (session.tavus_persona_status !== 'ready') {
-    throw new Error(`Persona is not ready. Current status: ${session.tavus_persona_status}`);
+  if (!session.tavus_conversation_id) {
+    throw new Error('No Tavus conversation found for this session');
   }
 
-  // Start the Tavus conversation
-  const { conversationId, sessionUrl } = await startTavusSession(session.tavus_persona_id);
-
-  // Update session with conversation ID and set status to active
-  const { error: updateError } = await supabase
-    .from('sessions')
-    .update({
-      tavus_conversation_id: conversationId,
-      status: 'active',
-      started_at: new Date().toISOString(),
-    })
-    .eq('id', sessionId);
-
-  if (updateError) {
-    throw new Error(`Failed to update session with conversation ID: ${updateError.message}`);
-  }
-
-  return sessionUrl;
+  // Conversation URL is not stored — this endpoint is deprecated in favor of start/route.ts
+  // Return the Tavus conversation URL pattern
+  return `https://tavus.daily.co/${session.tavus_conversation_id}`;
 }
 
 /**
@@ -211,11 +202,22 @@ export async function endSession(params: EndSessionParams): Promise<void> {
     // Reconcile session: set seconds_consumed, clear reservation, update user minutes
     await reconcileSession(sessionId, durationSeconds);
 
-    // Trigger debrief generation (will be implemented in task 18)
-    // For now, we'll just log that debrief should be triggered
-    console.log(`Debrief generation should be triggered for session ${sessionId}`);
-    // TODO: Call DebriefService.generateDebrief(sessionId) when implemented
+    // Trigger debrief generation
+    const debriefService = new DebriefService();
+    await debriefService.generateDebrief(sessionId);
   }
+}
+
+/**
+ * Interrupts an in-progress session (e.g. user dropped, connection lost)
+ * Saves partial transcript and releases the minute reservation.
+ */
+export async function interruptSession(
+  sessionId: string,
+  transcript: import('../types').Transcript,
+  durationSeconds: number
+): Promise<void> {
+  return endSession({ sessionId, transcript, durationSeconds, interrupted: true });
 }
 
 /**
