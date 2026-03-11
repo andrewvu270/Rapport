@@ -1,5 +1,5 @@
 /**
- * Serialization utilities for NetWork application
+ * Serialization utilities for Rapport application
  * 
  * These are thin wrappers around JSON.stringify / JSON.parse with error logging
  * as specified in Requirements 9 (Serialization Standard) and 9.7

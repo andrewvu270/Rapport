@@ -24,11 +24,12 @@ export interface PersonCard {
   icebreakers: string[];       // exactly 3, intel-grounded
   openers: string[];           // 3-5 conversation starters specific to this person
   followUpQuestions: string[]; // 3-5 follow-ups specific to this person
-  topicsOfInterest: string[];
-  thingsToAvoid: string[];
+  topicsOfInterest: { topic: string; hook: string }[]; // 3-4 human connection points with a natural conversation hook each
+  thingsToAvoid: { topic: string; why: string }[];     // sensitive areas with brief context on why to avoid
   suggestedAsk: string;
   replicaGender: 'male' | 'female';  // inferred from name/profile for Tavus replica selection
   limitedResearch: boolean;
+  isArchetype: boolean;              // true if AI-generated fictional persona (open networking mode)
   generatedAt: string;
 }
 

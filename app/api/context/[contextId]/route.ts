@@ -123,3 +123,35 @@ export async function GET(
     );
   }
 }
+
+/**
+ * DELETE /api/context/[contextId]
+ * Deletes a single context for the authenticated user.
+ */
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: { contextId: string } }
+) {
+  try {
+    const supabase = createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { error } = await supabase
+      .from('contexts')
+      .delete()
+      .eq('id', params.contextId)
+      .eq('user_id', user.id);
+
+    if (error) {
+      return NextResponse.json({ error: 'Failed to delete context' }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error in DELETE /api/context/[contextId]:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}

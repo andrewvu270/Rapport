@@ -8,6 +8,30 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/src/lib/supabase-server';
 import { PersonCard, ContextInput } from '@/src/types';
 
+export async function GET(request: NextRequest) {
+  try {
+    const supabase = createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const personCardId = request.nextUrl.searchParams.get('personCardId');
+    if (!personCardId) return NextResponse.json({ error: 'Missing personCardId' }, { status: 400 });
+
+    const { data: sessions, error } = await supabase
+      .from('sessions')
+      .select('id, session_type, status, started_at, duration_seconds')
+      .eq('person_card_id', personCardId)
+      .eq('user_id', user.id)
+      .eq('status', 'completed')
+      .order('started_at', { ascending: false });
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ sessions: sessions ?? [] });
+  } catch (error) {
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = createClient();

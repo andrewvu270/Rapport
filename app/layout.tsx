@@ -1,16 +1,16 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({
+const jakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
-  variable: '--font-inter',
+  variable: '--font-jakarta',
   display: 'swap',
 });
 
 export const metadata: Metadata = {
-  title: "NetWork - AI Networking Coach",
-  description: "Practice professional networking conversations with AI",
+  title: "Rapport — Walk into every networking event ready",
+  description: "Rapport researches who you'll meet, builds personalized talking points, and lets you practice with AI personas before the real thing.",
 };
 
 export default function RootLayout({
@@ -19,8 +19,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={inter.variable}>
-      <body className="font-sans antialiased bg-[#09090b] text-zinc-50 selection:bg-violet-500/30 selection:text-violet-200">
+    <html lang="en" className={jakarta.variable}>
+      <body className="font-sans antialiased bg-cream text-ink selection:bg-amber-400/20 selection:text-amber-900">
         {children}
       </body>
     </html>

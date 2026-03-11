@@ -27,6 +27,7 @@ export async function GET(_request: NextRequest) {
         industry,
         user_role,
         user_goal,
+        mode,
         created_at,
         expires_at,
         person_cards (
@@ -59,18 +60,21 @@ export async function GET(_request: NextRequest) {
         });
       }
 
+      const isOpenNetworking = ctx.mode === 'open_networking';
       return {
         id: ctx.id,
         eventType: ctx.event_type,
         industry: ctx.industry,
         userRole: ctx.user_role,
         userGoal: ctx.user_goal,
+        mode: ctx.mode,
         createdAt: ctx.created_at,
         expiresAt: ctx.expires_at,
         personCards: (ctx.person_cards || []).map((pc: any) => ({
           id: pc.id,
           participantName: pc.participant_name,
           limitedResearch: pc.limited_research,
+          isArchetype: isOpenNetworking,
           sessionCount: sessionCounts[pc.id] || 0,
         })),
       };
@@ -79,6 +83,34 @@ export async function GET(_request: NextRequest) {
     return NextResponse.json({ contexts: enriched });
   } catch (error) {
     console.error('Error in GET /api/context:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+/**
+ * DELETE /api/context
+ * Deletes all contexts for the authenticated user.
+ */
+export async function DELETE(_request: NextRequest) {
+  try {
+    const supabase = createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { error } = await supabase
+      .from('contexts')
+      .delete()
+      .eq('user_id', user.id);
+
+    if (error) {
+      return NextResponse.json({ error: 'Failed to clear library' }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error in DELETE /api/context:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -107,9 +139,10 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { contextInput, consentGiven } = body as {
+    const { contextInput, consentGiven, unknownMode } = body as {
       contextInput: ContextInput;
       consentGiven: boolean;
+      unknownMode?: boolean;
     };
 
     // Validate required context input fields (Requirement 1.1)
@@ -117,9 +150,16 @@ export async function POST(request: NextRequest) {
       !contextInput.eventType ||
       !contextInput.industry ||
       !contextInput.userRole ||
-      !contextInput.userGoal ||
-      !contextInput.targetPeopleDescription
+      !contextInput.userGoal
     ) {
+      return NextResponse.json(
+        { error: 'Missing required context fields' },
+        { status: 400 }
+      );
+    }
+
+    // In unknown mode, targetPeopleDescription is optional
+    if (!unknownMode && !contextInput.targetPeopleDescription) {
       return NextResponse.json(
         { error: 'Missing required context fields' },
         { status: 400 }
@@ -133,6 +173,55 @@ export async function POST(request: NextRequest) {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 90);
 
+    const prepService = new PrepService();
+
+    // --- UNKNOWN MODE: generate archetypal personas, skip intel ---
+    if (unknownMode) {
+      const archetypeCards = await prepService.generateArchetypes(contextInput);
+
+      const talkingPointsCard = await prepService.generateTalkingPointsCard(
+        contextInput, [], [], true
+      );
+
+      const { error: contextError } = await supabase
+        .from('contexts')
+        .insert({
+          id: contextId,
+          user_id: user.id,
+          mode: 'open_networking',
+          event_type: contextInput.eventType,
+          industry: contextInput.industry,
+          user_role: contextInput.userRole,
+          user_goal: contextInput.userGoal,
+          raw_input: contextInput,
+          talking_points_card: serialize(talkingPointsCard, {
+            documentType: 'TalkingPointsCard',
+            userId: user.id,
+          }),
+          expires_at: expiresAt.toISOString(),
+        });
+
+      if (contextError) {
+        console.error('Failed to insert context:', contextError);
+        return NextResponse.json({ error: 'Failed to save context' }, { status: 500 });
+      }
+
+      for (const card of archetypeCards) {
+        await supabase.from('person_cards').insert({
+          context_id: contextId,
+          user_id: user.id,
+          participant_name: card.participantName,
+          card_data: serialize(card, { documentType: 'PersonCard', userId: user.id }),
+          pinecone_namespace: null,
+          limited_research: false,
+        });
+      }
+
+      return NextResponse.json({ contextId, degradedMode: false, unknownMode: true });
+    }
+
+    // --- KNOWN MODE: gather intel, generate real person cards ---
+
     // Step 1: Gather intel
     const intelService = new IntelService();
     const { participants, degradedMode } = await intelService.gatherIntel(
@@ -143,8 +232,7 @@ export async function POST(request: NextRequest) {
     );
 
     // Step 2: Generate Talking Points Card
-    const prepService = new PrepService();
-    
+
     // Retrieve intel chunks for talking points (aggregate from all participants)
     let talkingPointsIntelChunks: string[] = [];
     if (!degradedMode && participants.length > 0) {
@@ -152,7 +240,7 @@ export async function POST(request: NextRequest) {
         // Create a query embedding from the context
         const queryText = `${contextInput.eventType} ${contextInput.industry} ${contextInput.userGoal}`;
         const [queryEmbedding] = await embedChunks([queryText]);
-        
+
         // Retrieve from each participant's namespace
         for (const participant of participants) {
           const namespace = `${user.id}/${contextId}/${participant.name}`;
@@ -175,13 +263,13 @@ export async function POST(request: NextRequest) {
     const personCards = [];
     for (const participant of participants) {
       let personIntelChunks: string[] = [];
-      
+
       if (!degradedMode) {
         try {
           // Create a query embedding from the participant's info
           const queryText = `${participant.name} ${participant.role || ''} ${participant.company || ''}`;
           const [queryEmbedding] = await embedChunks([queryText]);
-          
+
           const namespace = `${user.id}/${contextId}/${participant.name}`;
           personIntelChunks = await retrieveIntel(namespace, queryEmbedding, 5);
         } catch (error) {
@@ -195,7 +283,7 @@ export async function POST(request: NextRequest) {
         personIntelChunks,
         degradedMode
       );
-      
+
       personCards.push({
         participant,
         card: personCard,

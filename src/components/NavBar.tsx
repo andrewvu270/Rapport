@@ -17,42 +17,54 @@ export default function NavBar() {
   const isActive = (path: string) => pathname === path || pathname.startsWith(path + '/');
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-zinc-800/60 bg-[#09090b]/90 backdrop-blur-sm">
-      <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
-        <Link
-          href="/history"
-          className="text-sm font-semibold text-zinc-100 tracking-tight hover:text-white transition-colors"
-        >
-          NetWork
+    <header className="sticky top-0 z-50 border-b border-ink/[0.06] bg-cream/90 backdrop-blur-md">
+      <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between gap-4">
+        <Link href="/dashboard" className="text-base font-extrabold tracking-tight text-ink shrink-0">
+          Rapport
         </Link>
 
-        <div className="flex items-center gap-1">
+        <nav className="flex items-center gap-1">
+          <Link
+            href="/dashboard"
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              isActive('/dashboard')
+                ? 'bg-ink/[0.06] text-ink'
+                : 'text-ink-muted hover:text-ink hover:bg-ink/[0.04]'
+            }`}
+          >
+            Home
+          </Link>
           <Link
             href="/history"
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               isActive('/history')
-                ? 'bg-zinc-800 text-zinc-100'
-                : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/60'
+                ? 'bg-ink/[0.06] text-ink'
+                : 'text-ink-muted hover:text-ink hover:bg-ink/[0.04]'
             }`}
           >
-            History
+            Library
           </Link>
 
           <Link
             href="/prep"
-            className="ml-1 px-3 py-1.5 rounded-lg text-sm font-medium bg-violet-500 hover:bg-violet-600 text-white transition-colors active:scale-[0.98]"
+            className="ml-1 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold bg-ink text-cream hover:bg-ink/80 transition-colors"
           >
-            + New Prep
+            <span className="text-base leading-none">+</span>
+            <span className="hidden xs:inline">New Prep</span>
           </Link>
 
           <button
             onClick={handleLogout}
-            className="ml-1 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60 transition-colors cursor-pointer"
+            aria-label="Log out"
+            className="ml-1 px-3 py-1.5 rounded-lg text-sm font-medium text-ink-muted hover:text-ink hover:bg-ink/[0.04] transition-colors cursor-pointer"
           >
-            Log out
+            <span className="hidden sm:inline">Log out</span>
+            <svg className="w-4 h-4 sm:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
           </button>
-        </div>
+        </nav>
       </div>
-    </nav>
+    </header>
   );
 }

@@ -91,6 +91,7 @@ export class PrepService {
     return {
       ...card,
       limitedResearch,
+      isArchetype: false,
       generatedAt: new Date().toISOString(),
     };
   }
@@ -138,6 +139,64 @@ Return ONLY valid JSON in this exact format:
   }
 
   /**
+   * Generates 2-3 fictional but realistic archetypal personas for open networking mode.
+   * These are plausible people the user might meet, not real individuals.
+   */
+  async generateArchetypes(contextInput: ContextInput): Promise<PersonCard[]> {
+    const prompt = `You are an expert networking coach helping someone prepare for open networking at a ${contextInput.eventType} in the ${contextInput.industry} industry.
+
+The user is a ${contextInput.userRole} with this goal: ${contextInput.userGoal}
+
+Generate 2-3 fictional but realistic archetypes of people they're likely to meet. These should be plausible professionals, not real people. Give each a realistic full name.
+
+For each archetype, generate a Person Card that helps the user practice a conversation.
+
+For each archetype include 3-4 connection points mixing professional AND personal interests (hobbies, passions, things they geek out about outside work). Each connection point needs a warm, casual hook — a natural question or comment a friend might use to bring it up, not a formal question. Also include 0-2 things to avoid with a brief reason why (only if there's a real reason).
+
+Return ONLY valid JSON in this exact format:
+{
+  "archetypes": [
+    {
+      "participantName": "First Last",
+      "profileSummary": "2-3 sentence profile of this fictional professional",
+      "icebreakers": ["icebreaker1", "icebreaker2", "icebreaker3"],
+      "openers": ["opener1", "opener2", "opener3"],
+      "followUpQuestions": ["question1", "question2", "question3"],
+      "topicsOfInterest": [
+        { "topic": "Rock climbing", "hook": "Do you climb outdoors or mostly in the gym? I've been trying to get outside more." },
+        { "topic": "Early-stage investing", "hook": "What's a contrarian take you have on what makes a great early bet?" }
+      ],
+      "thingsToAvoid": [
+        { "topic": "Work-life balance", "why": "Went through burnout recently and is sensitive about it" }
+      ],
+      "suggestedAsk": "a realistic ask for this type of person",
+      "replicaGender": "male"
+    }
+  ]
+}`;
+
+    const response = await withRetry(async () => {
+      const res = await claude.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 3000,
+        messages: [{ role: 'user', content: prompt }],
+      });
+      const content = res.content[0];
+      if (content.type !== 'text') throw new Error('Unexpected response type');
+      const jsonMatch = content.text.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
+      const jsonText = jsonMatch ? jsonMatch[1] : content.text;
+      return JSON.parse(jsonText) as { archetypes: Omit<PersonCard, 'generatedAt' | 'limitedResearch' | 'isArchetype'>[] };
+    });
+
+    return response.archetypes.map((a) => ({
+      ...a,
+      limitedResearch: false,
+      isArchetype: true,
+      generatedAt: new Date().toISOString(),
+    }));
+  }
+
+  /**
    * Builds the prompt for generating a Person Card with per-person openers and follow-ups.
    */
   private buildPersonCardPrompt(
@@ -170,11 +229,11 @@ ${participant.topics.length > 0 ? `- Known Topics: ${participant.topics.join(', 
     }
 
     prompt += `1. A plain-English profile summary (2-3 sentences)
-2. Exactly 3 tailored icebreakers${intelChunks.length > 0 ? ' (each based on specific intel like recent posts, company news, or shared interests)' : ' (professional and appropriate for a first meeting)'}
+2. Exactly 3 tailored icebreakers${intelChunks.length > 0 ? ' (each based on specific intel like recent posts, company news, or shared experiences)' : ' (warm and appropriate for a first meeting — not stiff or corporate)'}
 3. Between 3 and 5 conversation openers the user could say to ${participant.name} — specific to this person, referencing their role/company/background. Each opener should address ${participant.name} by name naturally.
 4. Between 3 and 5 follow-up questions tailored to ${participant.name}'s background and the user's goal.
-5. Topics this person likely cares about (array of strings)
-6. Things to avoid in conversation with this person (array of strings)
+5. 3-4 CONNECTION POINTS — things this person cares about or enjoys, mixing professional interests AND personal ones (hobbies, passions, life interests). Each must include a warm, natural, non-technical "hook" — a casual question or comment that could spark genuine conversation and connection. Avoid jargon. Think: how would a friend bring this up?
+6. 0-3 things to avoid in conversation, each with a brief "why" — only include if there's a real reason (sensitive topic, bad experience, awkward history). Skip this if nothing notable.
 7. A suggested ask or favor appropriate for this specific person
 8. replicaGender: infer "male" or "female" from the participant's name and any profile information. Default to "female" if uncertain.
 
@@ -185,8 +244,13 @@ Return ONLY valid JSON in this exact format:
   "icebreakers": ["icebreaker1", "icebreaker2", "icebreaker3"],
   "openers": ["opener1", "opener2", "opener3"],
   "followUpQuestions": ["question1", "question2", "question3"],
-  "topicsOfInterest": ["topic1", "topic2"],
-  "thingsToAvoid": ["avoid1", "avoid2"],
+  "topicsOfInterest": [
+    { "topic": "Trail running", "hook": "Heard you ran the Dipsea last year — how was it? I've been wanting to try it." },
+    { "topic": "Climate tech", "hook": "What's a bet in this space you think is still really underrated?" }
+  ],
+  "thingsToAvoid": [
+    { "topic": "Time at previous company", "why": "Left on difficult terms" }
+  ],
   "suggestedAsk": "suggested ask text here",
   "replicaGender": "male"
 }`;

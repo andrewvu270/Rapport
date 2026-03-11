@@ -13,11 +13,10 @@ import { PersonCard, ContextInput } from '@/src/types';
 import { deserialize } from '@/src/lib/serialization';
 import { placeReservation } from '@/src/services/session/minuteReservation';
 import { buildSystemPrompt } from '@/src/services/session/promptBuilder';
-import { startVapiSession } from '@/src/services/session/vapiSession';
 import { startTavusVideoSession } from '@/src/services/session/tavusSession';
 
 export async function POST(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { sessionId: string } }
 ) {
   try {
@@ -103,14 +102,10 @@ export async function POST(
       const systemPrompt = buildSystemPrompt(persona, intelChunks, contextInput);
 
       if (session.session_type === 'voice') {
-        // Start Vapi voice session
-        const vapiCallId = await startVapiSession(systemPrompt);
-
-        // Update session with Vapi call ID and set to active
+        // Update session to active (callId will be stored by client after SDK call-start)
         const { error: updateError } = await supabase
           .from('sessions')
           .update({
-            vapi_call_id: vapiCallId,
             status: 'active',
             started_at: new Date().toISOString(),
           })
@@ -123,6 +118,19 @@ export async function POST(
         return NextResponse.json({
           sessionId,
           status: 'active',
+          assistantConfig: {
+            model: {
+              provider: 'openai',
+              model: 'gpt-4o',
+              messages: [{ role: 'system', content: systemPrompt }],
+            },
+            voice: {
+              provider: process.env.VAPI_VOICE_PROVIDER!,
+              voiceId: persona.replicaGender === 'male'
+                ? process.env.VAPI_VOICE_ID_M!
+                : process.env.VAPI_VOICE_ID_W!,
+            },
+          },
         });
       } else {
         // Video session: create Tavus persona + conversation synchronously (v2 API)

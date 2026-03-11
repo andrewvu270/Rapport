@@ -5,10 +5,17 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/src/lib/supabase'
 
+const features = [
+  'Intel on anyone you\'ll meet',
+  'Voice & video AI practice',
+  'Scored debrief every session',
+  'Homework drills to improve',
+]
+
 export default function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const nextPath = searchParams.get('next') || '/history'
+  const nextPath = searchParams.get('next') || '/dashboard'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -39,83 +46,108 @@ export default function LoginPage() {
     }
   }
 
+  const inputClass = "w-full px-3.5 py-2.5 bg-cream border border-ink/[0.1] rounded-xl text-sm text-ink placeholder-ink-muted/50 focus:border-ink/30 focus:ring-2 focus:ring-ink/[0.06] transition-colors outline-none"
+
   return (
-    <div className="min-h-screen bg-[#09090b] flex items-center justify-center px-4">
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[300px] bg-violet-500/6 blur-[120px] rounded-full" />
+    <div className="min-h-screen flex">
+      {/* Left panel — desktop only */}
+      <div
+        className="hidden lg:flex lg:w-1/2 bg-ink flex-col p-12"
+        style={{
+          backgroundImage: 'radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px)',
+          backgroundSize: '28px 28px',
+        }}
+      >
+        <Link href="/" className="text-lg font-extrabold tracking-tight text-cream">
+          Rapport
+        </Link>
+
+        <div className="flex-1 flex flex-col justify-center max-w-sm">
+          <p className="text-xs font-bold tracking-[0.2em] uppercase text-amber mb-6">
+            Interview Intelligence
+          </p>
+          <h1 className="text-4xl font-extrabold tracking-tight text-cream leading-tight mb-4">
+            Walk in prepared.
+          </h1>
+          <p className="text-cream/40 text-base mb-10">
+            AI intel. Practice personas. Scored debrief.
+          </p>
+
+          <ul className="space-y-4">
+            {features.map((feature) => (
+              <li key={feature} className="flex items-center gap-3">
+                <span className="text-amber text-xs leading-none">◆</span>
+                <span className="text-cream/80 text-sm">{feature}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
 
-      <div className="relative w-full max-w-sm animate-slide-up">
-        <div className="text-center mb-8">
-          <Link href="/" className="text-sm font-semibold text-zinc-100 hover:text-white transition-colors">
-            NetWork
-          </Link>
-          <p className="mt-2 text-sm text-zinc-500">Sign in to your account</p>
+      {/* Right panel — form */}
+      <div className="flex-1 flex items-center justify-center px-6 py-12 bg-cream">
+        <div className="w-full max-w-sm animate-slide-up">
+
+          <div className="text-center mb-8">
+            <Link href="/" className="text-lg font-extrabold tracking-tight text-ink">
+              Rapport
+            </Link>
+            <p className="mt-2 text-sm text-ink-muted">Sign in to your account</p>
+          </div>
+
+          <div className="bg-white border border-ink/[0.08] rounded-2xl p-8 shadow-[0_4px_24px_rgba(0,0,0,0.06)]">
+            {error && (
+              <div className="mb-5 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-600">
+                {error}
+              </div>
+            )}
+            {successMessage && (
+              <div className="mb-5 px-4 py-3 rounded-xl bg-green-50 border border-green-200 text-sm text-green-700">
+                {successMessage}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label htmlFor="email" className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
+                  Email
+                </label>
+                <input
+                  id="email" type="email" autoComplete="email" required
+                  value={email} onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com" className={inputClass}
+                />
+              </div>
+              <div>
+                <label htmlFor="password" className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
+                  Password
+                </label>
+                <input
+                  id="password" type="password" autoComplete="current-password" required
+                  value={password} onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••" className={inputClass}
+                />
+              </div>
+              <button
+                type="submit" disabled={loading}
+                className="w-full mt-2 bg-amber hover:bg-amber/90 disabled:opacity-50 disabled:cursor-not-allowed text-ink py-2.5 rounded-xl text-sm font-bold transition-colors active:scale-[0.98] shadow-[0_4px_0_#92400e]"
+              >
+                {loading ? 'Signing in...' : 'Sign in'}
+              </button>
+            </form>
+          </div>
+
+          <p className="mt-5 text-center text-sm text-ink-muted">
+            Don&apos;t have an account?{' '}
+            <Link href="/auth/register" className="font-semibold text-ink hover:text-ink-muted transition-colors">
+              Create one
+            </Link>
+          </p>
+          <p className="mt-3 text-center text-xs text-ink-muted/50">
+            By signing in, you agree to our{' '}
+            <Link href="/terms" className="underline hover:text-ink-muted transition-colors">Terms of Service</Link>
+          </p>
         </div>
-
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8">
-          {error && (
-            <div className="mb-5 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400">
-              {error}
-            </div>
-          )}
-          {successMessage && (
-            <div className="mb-5 px-4 py-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-sm text-emerald-400">
-              {successMessage}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="email" className="block text-xs font-medium text-zinc-500 mb-1.5 uppercase tracking-wider">
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                className="w-full px-3 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/20 transition-colors"
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="block text-xs font-medium text-zinc-500 mb-1.5 uppercase tracking-wider">
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full px-3 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/20 transition-colors"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full mt-2 bg-violet-500 hover:bg-violet-600 disabled:opacity-50 disabled:cursor-not-allowed text-white py-2.5 rounded-lg text-sm font-medium transition-colors active:scale-[0.98]"
-            >
-              {loading ? 'Signing in...' : 'Sign in'}
-            </button>
-          </form>
-        </div>
-
-        <p className="mt-5 text-center text-sm text-zinc-600">
-          Don't have an account?{' '}
-          <Link href="/auth/register" className="text-violet-400 hover:text-violet-300 transition-colors">
-            Create one
-          </Link>
-        </p>
-        <p className="mt-3 text-center text-xs text-zinc-700">
-          By signing in, you agree to our{' '}
-          <Link href="/terms" className="text-zinc-600 hover:text-zinc-400 underline transition-colors">Terms of Service</Link>
-        </p>
       </div>
     </div>
   )
