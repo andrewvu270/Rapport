@@ -48,7 +48,7 @@ export async function GET() {
         .eq('pending', false);
 
       // Fetch person card names for recent sessions
-      const personCardIds = [...new Set(allSessions.slice(0, 5).map(s => s.person_card_id).filter(Boolean))];
+      const personCardIds = Array.from(new Set(allSessions.slice(0, 5).map(s => s.person_card_id).filter(Boolean)));
       const { data: personCards } = personCardIds.length > 0
         ? await supabase.from('person_cards').select('id, card_data').in('id', personCardIds)
         : { data: [] };
