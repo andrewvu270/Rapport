@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as fc from 'fast-check';
 import { buildSystemPrompt } from './promptBuilder';
-import type { PersonCard, ContextInput } from '../../types';
 
 /**
  * **Feature: network-coach, Property 6: Session prompt construction contains all intel chunks**

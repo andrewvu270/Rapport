@@ -60,7 +60,7 @@ export class PrepService {
     participant: ExtractedParticipant,
     contextInput: ContextInput,
     intelChunks: string[],
-    degradedMode: boolean
+    _degradedMode: boolean
   ): Promise<PersonCard> {
     const limitedResearch = intelChunks.length === 0;
 
@@ -203,7 +203,7 @@ Return ONLY valid JSON in this exact format:
     participant: ExtractedParticipant,
     contextInput: ContextInput,
     intelChunks: string[],
-    limitedResearch: boolean
+    _limitedResearch: boolean
   ): string {
     let prompt = `You are an expert networking coach. Generate a Person Card to help a user prepare for a conversation with a specific individual at a ${contextInput.eventType}.
 

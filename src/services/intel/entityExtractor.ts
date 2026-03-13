@@ -75,7 +75,7 @@ Return ONLY the JSON object, no additional text or explanation.`;
     }
 
     // Ensure each participant has required fields
-    entities.participants = entities.participants.map((p: any) => ({
+    entities.participants = entities.participants.map((p: Record<string, unknown>) => ({
       name: p.name || '',
       role: p.role,
       company: p.company,

@@ -12,7 +12,7 @@ import { createServiceClient } from '../../lib/supabase-server';
 export async function placeReservation(
   sessionId: string,
   userId: string,
-  sessionType: 'voice' | 'video'
+  _sessionType: 'voice' | 'video'
 ): Promise<number> {
   const supabase = createServiceClient();
 

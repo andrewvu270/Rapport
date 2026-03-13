@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import * as fc from 'fast-check';
 import { embedChunks } from './embedding';
 import { upsertIntel, retrieveIntel } from './vectorStore';
