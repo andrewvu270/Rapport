@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ sessions: sessions ?? [] });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const persona: PersonCard = personCardRow.card_data as PersonCard;
+    const _persona: PersonCard = personCardRow.card_data as PersonCard;
 
     // Fetch the context to get contextInput
     const { data: contextRow, error: contextError } = await supabase
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const contextInput: ContextInput = contextRow.raw_input as ContextInput;
+    const _contextInput: ContextInput = contextRow.raw_input as ContextInput;
 
     // Create a reserved session (not started yet - user must acknowledge disclaimer first)
     const { data: session, error: createError } = await supabase

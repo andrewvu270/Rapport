@@ -207,14 +207,14 @@ export default function DebriefPage() {
 
   const toggleHomework = (index: number) => {
     const next = new Set(completedHomework);
-    next.has(index) ? next.delete(index) : next.add(index);
+    if (next.has(index)) { next.delete(index); } else { next.add(index); }
     setCompletedHomework(next);
     if (typeof window !== 'undefined') localStorage.setItem(`homework-${sessionId}`, JSON.stringify(Array.from(next)));
   };
 
   const toggleMoment = (index: number) => {
     const next = new Set(expandedMoments);
-    next.has(index) ? next.delete(index) : next.add(index);
+    if (next.has(index)) { next.delete(index); } else { next.add(index); }
     setExpandedMoments(next);
   };
 

@@ -37,6 +37,7 @@ export async function GET() {
 
     // Fetch recent debriefs (last 5)
     const recentSessionIds = allSessions.slice(0, 5).map(s => s.id);
+    // eslint-disable-next-line prefer-const
     let recentDebriefs: { sessionId: string; scores: DebriefReport['scores']; startedAt: string; sessionType: string; personName: string | null }[] = [];
 
     if (recentSessionIds.length > 0) {

@@ -5,7 +5,7 @@ import { createClient } from './supabase-server'
  * Auth middleware to protect API routes
  * Returns the authenticated user or an error response
  */
-export async function requireAuth(request: NextRequest) {
+export async function requireAuth(_request: NextRequest) {
   const supabase = createClient()
 
   const {

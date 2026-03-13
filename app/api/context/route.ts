@@ -255,6 +255,7 @@ export async function POST(request: NextRequest) {
     // Step 2: Generate Talking Points Card
 
     // Retrieve intel chunks for talking points (aggregate from all participants)
+    // eslint-disable-next-line prefer-const
     let talkingPointsIntelChunks: string[] = [];
     if (!degradedMode && participants.length > 0) {
       try {
