@@ -106,7 +106,6 @@ export async function startTavusVideoSession(
     replica_id: pickReplicaId(persona.replicaGender),
     persona_id: personaId,
     custom_greeting: greeting,
-    max_call_duration: 300,
   };
   if (callbackUrl) {
     convBody.callback_url = callbackUrl;
