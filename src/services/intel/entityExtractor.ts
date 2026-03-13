@@ -76,10 +76,10 @@ Return ONLY the JSON object, no additional text or explanation.`;
 
     // Ensure each participant has required fields
     entities.participants = entities.participants.map((p: Record<string, unknown>) => ({
-      name: p.name || '',
-      role: p.role,
-      company: p.company,
-      topics: Array.isArray(p.topics) ? p.topics : [],
+      name: typeof p.name === 'string' ? p.name : '',
+      role: typeof p.role === 'string' ? p.role : undefined,
+      company: typeof p.company === 'string' ? p.company : undefined,
+      topics: Array.isArray(p.topics) ? (p.topics as string[]) : [],
     }));
 
     return entities;
