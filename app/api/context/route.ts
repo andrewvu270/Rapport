@@ -7,6 +7,8 @@ import { embedChunks } from '@/src/services/intel/embedding';
 import { serialize } from '@/src/lib/serialization';
 import { ContextInput } from '@/src/types';
 
+export const maxDuration = 60;
+
 /**
  * GET /api/context
  * Returns all contexts for the authenticated user with person cards and session counts.
@@ -281,17 +283,14 @@ export async function POST(request: NextRequest) {
       degradedMode
     );
 
-    // Step 3: Generate Person Cards for each participant
-    const personCards = [];
-    for (const participant of participants) {
+    // Step 3: Generate Person Cards for each participant (in parallel)
+    const personCards = await Promise.all(participants.map(async (participant) => {
       let personIntelChunks: string[] = [];
 
       if (!degradedMode) {
         try {
-          // Create a query embedding from the participant's info
           const queryText = `${participant.name} ${participant.role || ''} ${participant.company || ''}`;
           const [queryEmbedding] = await embedChunks([queryText]);
-
           const namespace = `${user.id}/${contextId}/${participant.name}`;
           personIntelChunks = await retrieveIntel(namespace, queryEmbedding, 5);
         } catch (error) {
@@ -306,12 +305,12 @@ export async function POST(request: NextRequest) {
         degradedMode
       );
 
-      personCards.push({
+      return {
         participant,
         card: personCard,
         namespace: `${user.id}/${contextId}/${participant.name}`,
-      });
-    }
+      };
+    }));
 
     // Step 4: Persist context to Supabase
     const { error: contextError } = await supabase
