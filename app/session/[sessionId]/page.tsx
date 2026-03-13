@@ -726,16 +726,11 @@ export default function SessionPage() {
               <p className="text-[11px] text-white/50">Video Practice</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {elapsedSeconds >= SESSION_LIMIT - 60 && !timeLimitReached && (
-              <span className="text-[11px] font-semibold text-amber-400 animate-pulse">
-                {SESSION_LIMIT - elapsedSeconds}s left
-              </span>
-            )}
-            <p className={`text-sm font-mono font-bold tabular-nums ${elapsedSeconds >= SESSION_LIMIT - 60 ? 'text-amber-400' : 'text-white/70'}`}>
-              {formatTime(elapsedSeconds)}
-            </p>
-          </div>
+          {elapsedSeconds >= SESSION_LIMIT - 60 && !timeLimitReached && (
+            <span className="text-[11px] font-semibold text-amber-400 animate-pulse">
+              {SESSION_LIMIT - elapsedSeconds}s left
+            </span>
+          )}
         </div>
 
         {/* Speaking indicator */}
