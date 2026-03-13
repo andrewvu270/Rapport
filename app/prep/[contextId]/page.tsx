@@ -12,7 +12,7 @@ interface PastSession {
   id: string;
   session_type: 'voice' | 'video';
   started_at: string;
-  duration_seconds: number | null;
+  seconds_consumed: number | null;
 }
 
 function SpotlightCard({ children, className = '', spotlightColor = 'rgba(245, 158, 11, 0.10)' }: { children: React.ReactNode; className?: string; spotlightColor?: string }) {
@@ -313,8 +313,8 @@ function PersonCardTabs({
                         <span className="text-xs text-ink">
                           {new Date(s.started_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                         </span>
-                        {s.duration_seconds && (
-                          <span className="text-xs text-ink-muted/50">{Math.floor(s.duration_seconds / 60)}m {s.duration_seconds % 60}s</span>
+                        {s.seconds_consumed && (
+                          <span className="text-xs text-ink-muted/50">{Math.floor(s.seconds_consumed / 60)}m {s.seconds_consumed % 60}s</span>
                         )}
                       </div>
                       <span className="text-xs text-ink-muted/40">View debrief →</span>

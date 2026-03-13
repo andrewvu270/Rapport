@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/src/lib/supabase-server';
 import { PersonCard, ContextInput } from '@/src/types';
+import { rateLimit } from '@/src/lib/rateLimit';
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
 
     const { data: sessions, error } = await supabase
       .from('sessions')
-      .select('id, session_type, status, started_at, duration_seconds')
+      .select('id, session_type, status, started_at, seconds_consumed')
       .eq('person_card_id', personCardId)
       .eq('user_id', user.id)
       .eq('status', 'completed')
@@ -44,6 +45,11 @@ export async function POST(request: NextRequest) {
         { error: 'Unauthorized' },
         { status: 401 }
       );
+    }
+
+    // Rate limit: 5 session creations per minute per user
+    if (!rateLimit(`session:${user.id}`, 5, 60_000)) {
+      return NextResponse.json({ error: 'Too many requests. Please wait before starting another session.' }, { status: 429 });
     }
 
     const body = await request.json();

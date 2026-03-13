@@ -18,7 +18,7 @@ export async function GET() {
     // Fetch all completed sessions
     const { data: sessions } = await supabase
       .from('sessions')
-      .select('id, session_type, started_at, duration_seconds, person_card_id')
+      .select('id, session_type, started_at, seconds_consumed, person_card_id')
       .eq('user_id', user.id)
       .eq('status', 'completed')
       .order('started_at', { ascending: false });
@@ -27,13 +27,13 @@ export async function GET() {
 
     // Usage this month
     const monthSessions = allSessions.filter(s => s.started_at >= monthStart);
-    const secondsUsedThisMonth = monthSessions.reduce((sum, s) => sum + (s.duration_seconds ?? 0), 0);
+    const secondsUsedThisMonth = monthSessions.reduce((sum, s) => sum + (s.seconds_consumed ?? 0), 0);
 
     // Sessions this week
     const sessionsThisWeek = allSessions.filter(s => s.started_at >= weekStart).length;
 
     // Total practice time
-    const totalSeconds = allSessions.reduce((sum, s) => sum + (s.duration_seconds ?? 0), 0);
+    const totalSeconds = allSessions.reduce((sum, s) => sum + (s.seconds_consumed ?? 0), 0);
 
     // Fetch recent debriefs (last 5)
     const recentSessionIds = allSessions.slice(0, 5).map(s => s.id);

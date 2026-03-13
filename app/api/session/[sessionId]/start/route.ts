@@ -119,6 +119,8 @@ export async function POST(
           sessionId,
           status: 'active',
           assistantConfig: {
+            firstMessage: `Hi, I'm ${persona.participantName}. Great to meet you! What brings you here today?`,
+            maxDurationSeconds: 300,
             model: {
               provider: 'openai',
               model: 'gpt-4o',

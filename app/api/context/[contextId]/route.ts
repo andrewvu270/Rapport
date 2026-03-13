@@ -139,6 +139,28 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Cascade: delete child records first (sessions/debriefs/person_cards)
+    const { data: pcs } = await supabase
+      .from('person_cards')
+      .select('id')
+      .eq('context_id', params.contextId)
+      .eq('user_id', user.id);
+
+    const pcIds = (pcs || []).map((pc: any) => pc.id);
+    if (pcIds.length > 0) {
+      const { data: sess } = await supabase
+        .from('sessions')
+        .select('id')
+        .in('person_card_id', pcIds)
+        .eq('user_id', user.id);
+      const sessIds = (sess || []).map((s: any) => s.id);
+      if (sessIds.length > 0) {
+        await supabase.from('debriefs').delete().in('session_id', sessIds);
+      }
+      await supabase.from('sessions').delete().in('person_card_id', pcIds).eq('user_id', user.id);
+      await supabase.from('person_cards').delete().in('id', pcIds).eq('user_id', user.id);
+    }
+
     const { error } = await supabase
       .from('contexts')
       .delete()
@@ -146,6 +168,7 @@ export async function DELETE(
       .eq('user_id', user.id);
 
     if (error) {
+      console.error('Supabase context delete error:', error);
       return NextResponse.json({ error: 'Failed to delete context' }, { status: 500 });
     }
 

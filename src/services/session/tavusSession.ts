@@ -38,7 +38,7 @@ async function buildGreeting(persona: PersonCard, contextInput: ContextInput): P
 About ${firstName}:
 ${persona.profileSummary}
 
-Their interests: ${persona.topicsOfInterest.slice(0, 2).join(', ')}
+Their interests: ${persona.topicsOfInterest.slice(0, 2).map(t => t.topic).join(', ')}
 
 Rules:
 - 1-2 sentences max, no more
@@ -94,11 +94,19 @@ export async function startTavusVideoSession(
   const personaId: string = personaData.persona_id;
 
   // Create conversation with replica
-  const callbackUrl = process.env.TAVUS_WEBHOOK_URL;
+  const baseCallbackUrl = process.env.TAVUS_WEBHOOK_URL;
+  const webhookSecret = process.env.TAVUS_WEBHOOK_SECRET;
+  let callbackUrl = baseCallbackUrl;
+  if (baseCallbackUrl && webhookSecret) {
+    const url = new URL(baseCallbackUrl);
+    url.searchParams.set('secret', webhookSecret);
+    callbackUrl = url.toString();
+  }
   const convBody: Record<string, unknown> = {
     replica_id: pickReplicaId(persona.replicaGender),
     persona_id: personaId,
     custom_greeting: greeting,
+    max_call_duration: 300,
   };
   if (callbackUrl) {
     convBody.callback_url = callbackUrl;

@@ -9,115 +9,53 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/src/lib/supabase-server';
-import { startSession } from '@/src/services/SessionService';
-import { PersonCard, ContextInput } from '@/src/types';
-import { deserialize } from '@/src/lib/serialization';
 
+/**
+ * POST /api/session/[sessionId]/retry
+ * Creates a new reserved session with the same person card, context, and type.
+ */
 export async function POST(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { sessionId: string } }
 ) {
   try {
     const supabase = createClient();
-
-    // Verify authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
     if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { sessionId: originalSessionId } = params;
-
-    // Fetch the original session
-    const { data: originalSession, error: sessionError } = await supabase
+    const { data: original, error: sessionError } = await supabase
       .from('sessions')
-      .select('context_id, person_card_id, session_type, user_id')
-      .eq('id', originalSessionId)
+      .select('person_card_id, context_id, session_type')
+      .eq('id', params.sessionId)
       .eq('user_id', user.id)
       .single();
 
-    if (sessionError || !originalSession) {
-      return NextResponse.json(
-        { error: 'Original session not found' },
-        { status: 404 }
-      );
+    if (sessionError || !original) {
+      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
 
-    const { context_id: contextId, person_card_id: personCardId, session_type: sessionType } = originalSession;
-
-    // Fetch the person card
-    const { data: personCardRow, error: personCardError } = await supabase
-      .from('person_cards')
-      .select('card_data')
-      .eq('id', personCardId)
-      .eq('user_id', user.id)
-      .single();
-
-    if (personCardError || !personCardRow) {
-      return NextResponse.json(
-        { error: 'Person card not found' },
-        { status: 404 }
-      );
-    }
-
-    const persona: PersonCard = deserialize<PersonCard>(personCardRow.card_data);
-
-    // Fetch the context to get contextInput
-    const { data: contextRow, error: contextError } = await supabase
-      .from('contexts')
-      .select('raw_input')
-      .eq('id', contextId)
-      .eq('user_id', user.id)
-      .single();
-
-    if (contextError || !contextRow) {
-      return NextResponse.json(
-        { error: 'Context not found' },
-        { status: 404 }
-      );
-    }
-
-    const contextInput: ContextInput = contextRow.raw_input as ContextInput;
-
-    // Retrieve intel chunks from Pinecone for this person
-    // For now, we'll use empty array - intel retrieval will be wired in when vectorStore is integrated
-    const intelChunks: string[] = [];
-    // TODO: Retrieve from Pinecone using namespace from person_cards.pinecone_namespace
-
-    // Start the new session
-    const result = await startSession({
-      userId: user.id,
-      contextId,
-      personCardId,
-      sessionType,
-      persona,
-      intelChunks,
-      contextInput,
-    });
-
-    // Update the new session to link it to the original session
-    const { error: updateError } = await supabase
+    const { data: newSession, error: createError } = await supabase
       .from('sessions')
-      .update({
-        parent_session_id: originalSessionId,
+      .insert({
+        user_id: user.id,
+        context_id: original.context_id,
+        person_card_id: original.person_card_id,
+        session_type: original.session_type,
+        status: 'reserved',
+        parent_session_id: params.sessionId,
+        created_at: new Date().toISOString(),
       })
-      .eq('id', result.sessionId);
+      .select('id')
+      .single();
 
-    if (updateError) {
-      console.error('Failed to set parent_session_id:', updateError);
-      // Don't fail the request - the session was created successfully
+    if (createError || !newSession) {
+      return NextResponse.json({ error: 'Failed to create session' }, { status: 500 });
     }
 
-    return NextResponse.json(result);
+    return NextResponse.json({ sessionId: newSession.id });
   } catch (error) {
-    console.error('Error retrying session:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to retry session' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

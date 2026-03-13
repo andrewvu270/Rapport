@@ -17,7 +17,7 @@ export function buildSystemPrompt(
 ${persona.profileSummary}
 
 # Topics You Care About
-${persona.topicsOfInterest.map(topic => `- ${topic}`).join('\n')}
+${persona.topicsOfInterest.map(t => `- ${t.topic}`).join('\n')}
 
 # Context for This Conversation
 - Event Type: ${contextInput.eventType}
@@ -53,7 +53,7 @@ You are at a ${contextInput.eventType} — not conducting an interview. Your ene
 If you don't have specific information about something, stay grounded as someone who is meeting the user for the first time and be honest about what you know. Don't make things up.
 
 # Things to Avoid
-${persona.thingsToAvoid.map(item => `- ${item}`).join('\n')}
+${persona.thingsToAvoid.map(item => `- ${item.topic}`).join('\n')}
 - Asking two questions back to back
 - Formal or stiff language ("I'd be happy to discuss...", "That's a great question")
 - Sounding like you're evaluating or assessing the user

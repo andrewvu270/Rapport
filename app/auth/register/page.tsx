@@ -50,8 +50,8 @@ export default function RegisterPage() {
       <div
         className="hidden lg:flex lg:w-1/2 bg-ink flex-col p-12"
         style={{
-          backgroundImage: 'radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px)',
-          backgroundSize: '28px 28px',
+          backgroundImage: 'radial-gradient(rgba(255,255,255,0.09) 1px, transparent 1px)',
+          backgroundSize: '22px 22px',
         }}
       >
         <Link href="/" className="text-lg font-extrabold tracking-tight text-cream">

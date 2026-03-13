@@ -76,6 +76,7 @@ export default function SessionPage() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [sessionUrl, setSessionUrl] = useState<string | null>(null);
   const [isEnding, setIsEnding] = useState(false);
+  const [timeLimitReached, setTimeLimitReached] = useState(false);
 
   const [preparingStartTime, setPreparingStartTime] = useState<number | null>(null);
   const [hasTimedOut, setHasTimedOut] = useState(false);
@@ -91,6 +92,19 @@ export default function SessionPage() {
   const elapsedRef = useRef(0);
   const vapiRef = useRef<any>(null);
 
+  // Video (Daily.co call object) state
+  const [aiVideoTrack, setAiVideoTrack] = useState<MediaStreamTrack | null>(null);
+  const [aiAudioTrack, setAiAudioTrack] = useState<MediaStreamTrack | null>(null);
+  const [localVideoTrack, setLocalVideoTrack] = useState<MediaStreamTrack | null>(null);
+  const [isAIVideoSpeaking, setIsAIVideoSpeaking] = useState(false);
+  const [isVideoMuted, setIsVideoMuted] = useState(false);
+  const [isCamOff, setIsCamOff] = useState(false);
+  const dailyRef = useRef<any>(null);
+  const aiVideoRef = useRef<HTMLVideoElement>(null);
+  const aiAudioRef = useRef<HTMLAudioElement>(null);
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+
+  const isEndingRef = useRef(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -146,15 +160,17 @@ export default function SessionPage() {
 
       vapi.on('call-end', async () => {
         try {
+          // Map role→speaker so the debrief LLM knows who said what
+          const turns = transcriptRef.current.map(t => ({
+            speaker: t.role === 'assistant' ? 'persona' : 'user',
+            text: t.text,
+            timestamp: new Date().toISOString(),
+          }));
           await fetch(`/api/session/${sessionId}/end`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              transcript: {
-                turns: transcriptRef.current,
-                durationSeconds: elapsedRef.current,
-                sessionId,
-              },
+              transcript: { turns, durationSeconds: elapsedRef.current, sessionId },
               durationSeconds: elapsedRef.current,
             }),
           });
@@ -198,19 +214,106 @@ export default function SessionPage() {
   useEffect(() => { transcriptRef.current = transcript; }, [transcript]);
   useEffect(() => { elapsedRef.current = elapsedSeconds; }, [elapsedSeconds]);
 
-  // Listen for Daily.co postMessage when user leaves the Tavus video call
+  // Attach AI video track to element
   useEffect(() => {
-    if (session?.status !== 'active' || session.session_type !== 'video') return;
+    if (aiVideoTrack && aiVideoRef.current) {
+      aiVideoRef.current.srcObject = new MediaStream([aiVideoTrack]);
+    }
+  }, [aiVideoTrack]);
 
-    const handleMessage = (event: MessageEvent) => {
-      const action = event.data?.action ?? event.data?.event;
-      if (action === 'left-meeting' || action === 'meeting-left' || action === 'call-ended') {
-        handleEndVideoSession();
+  // Attach local video track to element
+  useEffect(() => {
+    if (localVideoTrack && localVideoRef.current) {
+      localVideoRef.current.srcObject = new MediaStream([localVideoTrack]);
+    }
+  }, [localVideoTrack]);
+
+  // Attach AI audio track to <audio> element for playback
+  useEffect(() => {
+    if (aiAudioTrack && aiAudioRef.current) {
+      aiAudioRef.current.srcObject = new MediaStream([aiAudioTrack]);
+      aiAudioRef.current.play().catch(err => console.warn('[Audio] autoplay blocked:', err));
+    }
+  }, [aiAudioTrack]);
+
+  // Initialize Daily.co call object for video sessions
+  useEffect(() => {
+    if (session?.status !== 'active' || session.session_type !== 'video' || !sessionUrl) return;
+
+    let daily: any;
+    const initDaily = async () => {
+      const DailyIframe = (await import('@daily-co/daily-js')).default;
+      daily = DailyIframe.createCallObject();
+      dailyRef.current = daily;
+
+      daily.on('participant-joined', (evt: any) => {
+        const p = evt.participant;
+        if (!p.local) {
+          // AI joined — grab existing tracks
+          const vt = p.tracks?.video?.persistentTrack;
+          if (vt) setAiVideoTrack(vt);
+          const at = p.tracks?.audio?.persistentTrack;
+          if (at) setAiAudioTrack(at);
+        }
+      });
+
+      daily.on('track-started', (evt: any) => {
+        const { participant, track } = evt;
+        if (!participant.local && track.kind === 'video') setAiVideoTrack(track);
+        if (!participant.local && track.kind === 'audio') setAiAudioTrack(track);
+        if (participant.local && track.kind === 'video') setLocalVideoTrack(track);
+      });
+
+      daily.on('track-stopped', (evt: any) => {
+        const { participant, track } = evt;
+        if (!participant.local && track.kind === 'video') setAiVideoTrack(null);
+        if (!participant.local && track.kind === 'audio') setAiAudioTrack(null);
+        if (participant.local && track.kind === 'video') setLocalVideoTrack(null);
+      });
+
+      daily.on('participant-updated', (evt: any) => {
+        const p = evt.participant;
+        if (!p.local) {
+          // Detect AI speaking via audio activity
+          setIsAIVideoSpeaking(!!p.audio);
+        }
+      });
+
+      daily.on('left-meeting', () => {
+        // no-op: end is always triggered explicitly via handleEndVideoSession
+      });
+
+      daily.on('error', (err: any) => {
+        console.error('Daily error:', err);
+      });
+
+      // Trigger browser permission prompt, then immediately release the stream
+      // so Daily can exclusively own the camera/mic without conflicts
+      try {
+        const permStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+        permStream.getTracks().forEach(t => t.stop());
+      } catch {
+        try {
+          const permStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          permStream.getTracks().forEach(t => t.stop());
+        } catch { /* ignore */ }
       }
+
+      await daily.join({ url: sessionUrl });
     };
 
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
+    initDaily();
+
+    return () => {
+      if (daily) daily.destroy();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.status, session?.session_type, sessionUrl]);
+
+  // (postMessage listener no longer needed — Daily SDK handles left-meeting)
+  useEffect(() => {
+    if (session?.status !== 'active' || session.session_type !== 'video') return;
+    // no-op: kept for future use
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.status, session?.session_type]);
 
@@ -278,6 +381,20 @@ export default function SessionPage() {
     }
   }, [session?.status, session?.started_at]);
 
+  const SESSION_LIMIT = 300; // 5 minutes
+
+  useEffect(() => {
+    if (session?.status !== 'active' || elapsedSeconds < SESSION_LIMIT) return;
+    if (timeLimitReached) return;
+    setTimeLimitReached(true);
+    if (session.session_type === 'voice') {
+      handleEndVoiceSession();
+    } else {
+      handleEndVideoSession();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [elapsedSeconds, session?.status, session?.session_type, timeLimitReached]);
+
   useEffect(() => {
     if (session?.status === 'completed') {
       const timeout = setTimeout(() => router.push(`/debrief/${sessionId}`), 2000);
@@ -293,6 +410,10 @@ export default function SessionPage() {
 
   const handleStartPractice = async () => {
     if (!disclaimerAccepted) return;
+    // Unlock AudioContext synchronously inside the click handler.
+    // This MUST happen before any await — the browser only counts it as a
+    // user-gesture activation if it runs in the same synchronous turn.
+    try { new (window.AudioContext || (window as any).webkitAudioContext)().resume(); } catch { /* ignore */ }
     setIsStarting(true);
     try {
       const response = await fetch(`/api/session/${sessionId}/start`, { method: 'POST' });
@@ -326,20 +447,39 @@ export default function SessionPage() {
   };
 
   const handleEndVideoSession = async () => {
-    if (isEnding) return;
+    if (isEndingRef.current) return;
+    isEndingRef.current = true;
     setIsEnding(true);
     try {
-      const response = await fetch(`/api/session/${sessionId}/end`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ durationSeconds: elapsedSeconds, transcript: { turns: [], durationSeconds: elapsedSeconds, sessionId } }),
-      });
-      if (!response.ok) throw new Error('Failed to end session');
-      setSession(prev => prev ? { ...prev, status: 'completed' } : null);
+      // Leave the Daily room first (stops video/audio)
+      const daily = dailyRef.current;
+      if (daily) {
+        dailyRef.current = null;
+        await daily.leave();
+        daily.destroy();
+      }
+      // Signal Tavus to end — transcript arrives via webhook (application.transcription_ready)
+      // Status polling (every 3s) will detect 'completed' and redirect to debrief
+      await fetch(`/api/session/${sessionId}/end-video`, { method: 'POST' });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to end session');
       setIsEnding(false);
+      isEndingRef.current = false;
     }
+  };
+
+  const handleVideoToggleMute = () => {
+    if (!dailyRef.current) return;
+    const newMuted = !isVideoMuted;
+    dailyRef.current.setLocalAudio(!newMuted);
+    setIsVideoMuted(newMuted);
+  };
+
+  const handleVideoToggleCam = () => {
+    if (!dailyRef.current) return;
+    const newOff = !isCamOff;
+    dailyRef.current.setLocalVideo(!newOff);
+    setIsCamOff(newOff);
   };
 
   const handleToggleMute = () => {
@@ -540,20 +680,137 @@ export default function SessionPage() {
     );
   }
 
-  // ── Active — Video ───────────────────────────────────────────────────────
+  // ── Active — Video (Custom Daily.co UI) ─────────────────────────────────
   if (session.status === 'active' && session.session_type === 'video') {
     return (
-      <div className="fixed inset-0 bg-black">
-        {sessionUrl ? (
-          <iframe
-            src={sessionUrl}
-            className="w-full h-full"
-            allow="camera; microphone; fullscreen"
-            title="Video Session"
-          />
-        ) : (
-          <div className="flex items-center justify-center h-full">
-            <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+      // fixed inset-0 guarantees true fullscreen regardless of body/html styles
+      <div className="fixed inset-0 bg-black overflow-hidden" style={{ zIndex: 9999 }}>
+        {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+        <audio ref={aiAudioRef} autoPlay hidden />
+
+        {/* AI video — always rendered, hidden until track arrives */}
+        <video
+          ref={aiVideoRef}
+          autoPlay
+          playsInline
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${aiVideoTrack ? 'opacity-100' : 'opacity-0'}`}
+        />
+
+        {/* Loading state — shown until AI video track arrives */}
+        {!aiVideoTrack && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 bg-[#111]">
+            <div className="relative">
+              <div className="w-24 h-24 rounded-full bg-white/10 flex items-center justify-center text-4xl font-bold text-white">
+                {personCard.participantName.charAt(0)}
+              </div>
+              <span className="absolute inset-[-6px] rounded-full border border-white/20 animate-ping" />
+            </div>
+            <div className="text-center space-y-1.5">
+              <p className="text-white font-semibold">{personCard.participantName}</p>
+              <div className="flex items-center justify-center gap-2 text-white/40 text-sm">
+                <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+                Connecting…
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Top bar — always visible over video */}
+        <div className="absolute top-0 inset-x-0 px-5 pt-4 pb-8 flex items-center justify-between bg-gradient-to-b from-black/70 via-black/30 to-transparent pointer-events-none">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-full bg-white/15 flex items-center justify-center text-xs font-bold text-white">
+              {personCard.participantName.charAt(0)}
+            </div>
+            <div>
+              <p className="text-sm font-bold text-white leading-tight">{personCard.participantName}</p>
+              <p className="text-[11px] text-white/50">Video Practice</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {elapsedSeconds >= SESSION_LIMIT - 60 && !timeLimitReached && (
+              <span className="text-[11px] font-semibold text-amber-400 animate-pulse">
+                {SESSION_LIMIT - elapsedSeconds}s left
+              </span>
+            )}
+            <p className={`text-sm font-mono font-bold tabular-nums ${elapsedSeconds >= SESSION_LIMIT - 60 ? 'text-amber-400' : 'text-white/70'}`}>
+              {formatTime(elapsedSeconds)}
+            </p>
+          </div>
+        </div>
+
+        {/* Speaking indicator */}
+        {aiVideoTrack && isAIVideoSpeaking && (
+          <div className="absolute bottom-28 inset-x-0 flex justify-center pointer-events-none">
+            <div className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full bg-black/50 backdrop-blur-sm text-white/90">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+              {personCard.participantName.split(' ')[0]} is speaking
+            </div>
+          </div>
+        )}
+
+        {/* Local cam PiP — bottom-right, above controls */}
+        <div className="absolute bottom-24 right-4 w-36 h-24 rounded-xl overflow-hidden bg-white/5 shadow-2xl ring-1 ring-white/10">
+          {localVideoTrack && !isCamOff ? (
+            <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover scale-x-[-1]" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <svg className="w-5 h-5 text-white/20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+            </div>
+          )}
+        </div>
+
+        {/* Controls — floating bar at bottom */}
+        <div className="absolute bottom-0 inset-x-0 pt-8 pb-6 flex items-center justify-center gap-5 bg-gradient-to-t from-black/70 via-black/30 to-transparent">
+          <button
+            onClick={handleVideoToggleMute}
+            className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${
+              isVideoMuted ? 'bg-red-500 text-white' : 'bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm'
+            }`}
+            title={isVideoMuted ? 'Unmute' : 'Mute'}
+          >
+            {isVideoMuted ? (
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" /></svg>
+            ) : (
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
+            )}
+          </button>
+
+          <button
+            onClick={handleEndVideoSession}
+            disabled={isEnding}
+            className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white flex items-center justify-center transition-colors shadow-[0_4px_20px_rgba(239,68,68,0.5)]"
+            title="End call"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z" />
+            </svg>
+          </button>
+
+          <button
+            onClick={handleVideoToggleCam}
+            className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${
+              isCamOff ? 'bg-red-500 text-white' : 'bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm'
+            }`}
+            title={isCamOff ? 'Turn camera on' : 'Turn camera off'}
+          >
+            {isCamOff ? (
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3l18 18" /></svg>
+            ) : (
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+            )}
+          </button>
+        </div>
+
+        {/* Ending overlay */}
+        {isEnding && (
+          <div className="absolute inset-0 bg-black/85 backdrop-blur-sm z-50 flex flex-col items-center justify-center gap-5">
+            <div className="w-12 h-12 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+            <div className="text-center">
+              <p className="text-sm font-semibold text-white mb-1">{timeLimitReached ? "Time's up!" : 'Ending session…'}</p>
+              <p className="text-xs text-white/40">{timeLimitReached ? 'Free sessions are limited to 5 minutes. Generating your debrief…' : 'Generating your debrief report'}</p>
+            </div>
           </div>
         )}
       </div>
@@ -578,7 +835,16 @@ export default function SessionPage() {
               <p className="text-xs text-ink-muted">Voice Practice</p>
             </div>
           </div>
-          <p className="text-base font-mono font-bold text-ink tabular-nums">{formatTime(elapsedSeconds)}</p>
+          <div className="flex items-center gap-2">
+            {elapsedSeconds >= SESSION_LIMIT - 60 && !timeLimitReached && (
+              <span className="text-xs font-semibold text-amber-500 animate-pulse">
+                {SESSION_LIMIT - elapsedSeconds}s left
+              </span>
+            )}
+            <p className={`text-base font-mono font-bold tabular-nums ${elapsedSeconds >= SESSION_LIMIT - 60 ? 'text-amber-500' : 'text-ink'}`}>
+              {formatTime(elapsedSeconds)}
+            </p>
+          </div>
         </div>
 
         {/* Main area */}
@@ -664,8 +930,8 @@ export default function SessionPage() {
             </div>
           </div>
 
-          {/* Transcript — right panel */}
-          <div className="w-72 border-l border-ink/[0.06] bg-white flex flex-col">
+          {/* Transcript — right panel (hidden on mobile) */}
+          <div className="hidden sm:flex w-72 border-l border-ink/[0.06] bg-white flex-col">
             <div className="px-4 py-3 border-b border-ink/[0.06] shrink-0">
               <p className="text-xs font-semibold text-ink-muted uppercase tracking-wider">Transcript</p>
             </div>
@@ -700,8 +966,8 @@ export default function SessionPage() {
               </div>
             </div>
             <div className="text-center">
-              <p className="text-sm font-semibold text-ink mb-1">Ending session…</p>
-              <p className="text-xs text-ink-muted">Generating your debrief report</p>
+              <p className="text-sm font-semibold text-ink mb-1">{timeLimitReached ? "Time's up!" : 'Ending session…'}</p>
+              <p className="text-xs text-ink-muted">{timeLimitReached ? 'Free sessions are limited to 5 minutes. Generating your debrief…' : 'Generating your debrief report'}</p>
             </div>
           </div>
         )}
